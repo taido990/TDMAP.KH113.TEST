@@ -2242,6 +2242,230 @@
       color: #ff8a80;
     }
 
+    /* Khung tiến trình khi lưu lên Drive: che toàn màn hình, không cho thao tác */
+    .sc-busy {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 10, 16, .78);
+      backdrop-filter: blur(2px);
+      padding: 20px;
+    }
+
+    .sc-busy.show {
+      display: flex;
+    }
+
+    .sc-busy .box {
+      width: 100%;
+      max-width: 340px;
+      background: #13212d;
+      border: 1px solid rgba(0, 198, 167, .45);
+      border-radius: 14px;
+      padding: 18px 16px;
+      text-align: center;
+      color: #dbe6ee;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+    }
+
+    .sc-busy .spin {
+      width: 38px;
+      height: 38px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      border: 4px solid rgba(0, 198, 167, .25);
+      border-top-color: #00c6a7;
+      animation: scSpin .9s linear infinite;
+    }
+
+    @keyframes scSpin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .sc-busy .ttl {
+      font-weight: 800;
+      font-size: 15px;
+      color: #00c6a7;
+      margin-bottom: 4px;
+    }
+
+    .sc-busy .bar {
+      height: 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, .12);
+      overflow: hidden;
+      margin: 10px 0 6px;
+    }
+
+    .sc-busy .bar i {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, #00c6a7, #00e0bd);
+      transition: width .3s;
+    }
+
+    .sc-busy .pct {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .sc-busy .txt {
+      font-size: 12.5px;
+      line-height: 1.45;
+      margin-top: 4px;
+      word-break: break-word;
+    }
+
+    .sc-busy small {
+      display: block;
+      margin-top: 10px;
+      font-size: 11.5px;
+      color: #ffb74d;
+      font-weight: 700;
+    }
+
+    /* Giao diện SÁNG cho trình Scan (nút ☀️/🌙). Khung camera vẫn nền đen. */
+    #scanOverlay.light {
+      background: #eef2f6;
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-top,
+    #scanOverlay.light .sc-settings,
+    #scanOverlay.light .sc-bottom,
+    #scanOverlay.light .sc-save,
+    #scanOverlay.light .sc-actions,
+    #scanOverlay.light .sc-filters,
+    #scanOverlay.light .sc-edit-bar {
+      background: #ffffff;
+      border-color: rgba(0, 0, 0, .08);
+    }
+
+    #scanOverlay.light #scReview {
+      background: #eef2f6;
+    }
+
+    #scanOverlay.light .sc-iconbtn {
+      background: rgba(0, 0, 0, .06);
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-iconbtn.on {
+      background: #00c6a7;
+      color: #00261f;
+    }
+
+    #scanOverlay.light .sc-title {
+      color: #00897b;
+    }
+
+    #scanOverlay.light .sc-settings label,
+    #scanOverlay.light .sc-msg,
+    #scanOverlay.light #scUser,
+    #scanOverlay.light .sc-save span,
+    #scanOverlay.light .sc-save label {
+      color: #4f6070 !important;
+    }
+
+    #scanOverlay.light .sc-settings select,
+    #scanOverlay.light .sc-settings input,
+    #scanOverlay.light .sc-kind button,
+    #scanOverlay.light .sc-settings .sc-types label,
+    #scanOverlay.light .sc-folder,
+    #scanOverlay.light .sc-chip,
+    #scanOverlay.light .sc-card,
+    #scanOverlay.light .sc-thumbbtn {
+      background: #f4f7fa;
+      color: #1b2733 !important;
+      border-color: rgba(0, 0, 0, .14);
+    }
+
+    #scanOverlay.light .sc-kind button.on,
+    #scanOverlay.light .sc-chip.on {
+      background: #00c6a7;
+      border-color: #00c6a7;
+      color: #00261f !important;
+    }
+
+    #scanOverlay.light .sc-settings .sc-types label.on {
+      background: rgba(0, 198, 167, .14);
+      border-color: #00c6a7;
+    }
+
+    #scanOverlay.light .sc-folder #scFolderName {
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-card .acts button {
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-btn {
+      background: #e3e9ef;
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-btn.green {
+      background: #00a884;
+      color: #fff;
+    }
+
+    #scanOverlay.light .sc-btn.primary {
+      background: #1a6fd4;
+      color: #fff;
+    }
+
+    #scanOverlay.light .sc-empty {
+      color: #5b6b78;
+    }
+
+    #scanOverlay.light .sc-qr {
+      background: #ffffff;
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-qr td:first-child {
+      color: #5b6b78;
+    }
+
+    #scanOverlay.light .sc-qr .hd button {
+      background: #f4f7fa;
+      color: #1b2733;
+      border-color: rgba(0, 0, 0, .14);
+    }
+
+    #scanOverlay.light .sc-msg.ok {
+      color: #00897b !important;
+    }
+
+    #scanOverlay.light .sc-msg.err {
+      color: #d84315 !important;
+    }
+
+    #scanOverlay.light .sc-busy {
+      background: rgba(235, 240, 245, .82);
+    }
+
+    #scanOverlay.light .sc-busy .box {
+      background: #ffffff;
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-busy .pct {
+      color: #1b2733;
+    }
+
+    #scanOverlay.light .sc-busy .bar {
+      background: rgba(0, 0, 0, .1);
+    }
+
     .sc-msg {
       font-size: 12.5px;
       color: #9fb3c3;
@@ -2715,6 +2939,7 @@
       <button class="sc-iconbtn" id="scCamBtn" onclick="ScanHS.toggleCamMode()" title="Đổi camera">🎥</button>
       <button class="sc-iconbtn" id="scAutoBtn" onclick="ScanHS.toggleAuto()"
         title="Tự động chụp khi nhận diện được tờ giấy">AUTO</button>
+      <button class="sc-iconbtn" id="scThemeBtn" onclick="ScanHS.toggleTheme()" title="Bật/tắt giao diện tối">☀️</button>
       <button class="sc-iconbtn" onclick="ScanHS.toggleSettings()" title="Ẩn/hiện thiết lập">⚙️</button>
     </div>
     <div class="sc-settings" id="scSettings">
@@ -2803,6 +3028,16 @@
         title="Chụp bằng app camera gốc của điện thoại (nét nhất), rồi tự cắt theo viền">📱<small>Camera
           gốc</small></button>
       <button class="sc-done" id="scDoneBtn" onclick="ScanHS.showReview()" disabled>Xong ›</button>
+    </div>
+    <div class="sc-busy" id="scBusy" role="alertdialog" aria-live="polite">
+      <div class="box">
+        <div class="spin"></div>
+        <div class="ttl" id="scBusyTitle">☁️ Đang lưu lên Drive…</div>
+        <div class="pct" id="scBusyPct">0%</div>
+        <div class="bar"><i id="scBusyBar"></i></div>
+        <div class="txt" id="scBusyText"></div>
+        <small>⚠ Vui lòng không thao tác, không thoát trang hay tắt màn hình cho tới khi xong.</small>
+      </div>
     </div>
     <input type="file" id="scCapInput" accept="image/*" capture="environment" hidden onchange="ScanHS.onFiles(this)">
     <input type="file" id="scPickInput" accept="image/*" multiple hidden onchange="ScanHS.onFiles(this)">
@@ -8117,10 +8352,51 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         renderFolder();
         return st.folder;
       }
+      // ── KHUNG TIẾN TRÌNH KHI LƯU (che màn hình, chặn thao tác) ──────────────────────
+      // Apps Script không cho đo % tải lên thật (gắn sự kiện upload sẽ phát sinh preflight CORS bị từ chối),
+      // nên % = bước đã xong + ước lượng theo dung lượng file trong lúc đang gửi.
+      const busy = { timer: 0, t0: 0 };
+      function busyShow(on) {
+        $('scBusy').classList.toggle('show', !!on);
+        clearInterval(busy.timer);
+        if (on) { busy.t0 = Date.now(); busyUpdate(0, ''); }
+      }
+      function busyUpdate(pct, text) {
+        const p = Math.max(0, Math.min(100, Math.round(pct)));
+        $('scBusyPct').textContent = p + '%';
+        $('scBusyBar').style.width = p + '%';
+        if (text != null) $('scBusyText').innerHTML = text + ` <span style="opacity:.7">· ${Math.round((Date.now() - busy.t0) / 1000)} giây</span>`;
+      }
+      // Trong lúc chờ máy chủ: % bò dần từ "from" tới gần "to" theo thời gian ước tính (giây).
+      function busyCreep(from, to, estSec, text) {
+        clearInterval(busy.timer);
+        const t = Date.now();
+        busy.timer = setInterval(() => {
+          const k = 1 - Math.exp(-(Date.now() - t) / 1000 / Math.max(1, estSec));
+          busyUpdate(from + (to - from) * k * 0.97, text);
+        }, 250);
+      }
+      // Chặn thoát trang khi đang lưu.
+      window.addEventListener('beforeunload', e => { if (st.uploading) { e.preventDefault(); e.returnValue = ''; } });
+      // ── GIAO DIỆN SÁNG / TỐI ──────────────────────────────────────────────────────
+      function applyTheme() {
+        const light = readJson(PREF_KEY, {}).theme === 'light';
+        $('scanOverlay').classList.toggle('light', light);
+        $('scThemeBtn').textContent = light ? '🌙' : '☀️';
+        $('scThemeBtn').title = light ? 'Chuyển sang giao diện tối' : 'Chuyển sang giao diện sáng';
+      }
+      function toggleTheme() {
+        const pref = readJson(PREF_KEY, {}); pref.theme = pref.theme === 'light' ? 'dark' : 'light'; writeJson(PREF_KEY, pref);
+        applyTheme();
+      }
       // Lưu 1 file PDF của loại hồ sơ đang nạp (st.pages, tên file, khổ giấy) vào st.folder.
-      async function uploadCurrent() {
+      async function uploadCurrent(prog) {
+        prog = prog || (() => { });
+        prog(0.05, 'Đang tạo file PDF…');
         const doc = await buildPdf();
         const b64 = doc.output('datauristring').split(',')[1];
+        const mb = b64.length * 0.75 / 1048576;
+        prog(0.3, `Đang gửi ${mb.toFixed(1)} MB lên Drive…`, Math.max(3, mb * 2.5));
         const t = curType();
         const d = await api('uploadScan', {
           folderId: st.folder.id,
@@ -8153,11 +8429,12 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           setMsg('Cần đăng nhập tài khoản xã để lưu lên thư mục chia sẻ.', 'err'); login(); return;
         }
         if (!st.folder && !st.pendingFolder) { setMsg('Chọn thư mục tờ-thửa để lưu hồ sơ trước.', 'err'); openFolderPicker(); return; }
-        st.uploading = true; renderUser();
+        st.uploading = true; renderUser(); busyShow(true);
         const orig = { kind: st.kind, type: $('scType').value, key: st.curKey, name: $('scFileName').value, touched: st.nameTouched, paper: $('scPaper').value };
         const done = [], fail = [];
         try {
           setMsg('⏳ Đang mở thư mục tờ-thửa…');
+          busyUpdate(2, 'Đang mở thư mục tờ-thửa…');
           await ensureFolder();
           for (let i = 0; i < jobs.length; i++) {
             const [key, pages] = jobs[i], [kind, type] = key.split(':');
@@ -8165,7 +8442,10 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             $('scPaper').value = key === orig.key ? orig.paper : curType().paper;
             if (key === orig.key && orig.touched) { st.nameTouched = true; $('scFileName').value = orig.name; } else { st.nameTouched = false; updateName(); }
             setMsg(`⏳ (${i + 1}/${jobs.length}) Đang lưu <b>${esc(cleanFileName())}.pdf</b> vào “${esc(st.folder.name)}”…`);
-            try { const d = await uploadCurrent(); done.push({ d, n: pages.length }); st.sets[key] = []; }
+            const head = `File ${i + 1}/${jobs.length}: <b>${esc(cleanFileName())}.pdf</b> (${pages.length} trang)<br>📁 ${esc(st.folder.name)}<br>`;
+            const base = 5 + 95 * i / jobs.length, span = 95 / jobs.length;
+            const prog = (f, txt, estSec) => { const tx = head + txt; if (estSec) busyCreep(base + span * f, base + span * 0.98, estSec, tx); else { clearInterval(busy.timer); busyUpdate(base + span * f, tx); } };
+            try { const d = await uploadCurrent(prog); done.push({ d, n: pages.length }); st.sets[key] = []; busyUpdate(base + span, head + '✓ Đã lưu'); }
             catch (e) { fail.push({ name: cleanFileName(), msg: e.message, code: e.code }); if (e.code === 'NO_SESSION') break; }
           }
         } catch (e) { fail.push({ name: 'thư mục tờ-thửa', msg: e.message, code: e.code }); }
@@ -8173,7 +8453,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           st.kind = orig.kind; $('scType').value = orig.type; st.curKey = orig.key; st.pages = st.sets[orig.key] || [];
           $('scPaper').value = orig.paper; st.nameTouched = orig.touched; if (orig.touched) $('scFileName').value = orig.name;
           updateName();
-          st.uploading = false; renderUser(); refreshCount(); renderGrid();
+          st.uploading = false; busyShow(false); renderUser(); refreshCount(); renderGrid(); renderQr();
         }
         const ok = done.map(({ d, n }) => `✓ <a href="${esc(d.file.url)}" target="_blank" rel="noopener"><b>${esc(d.file.name)}</b></a> (${n} trang)${d.overwritten ? ' — ghi đè' : ''}`);
         const er = fail.map(f => `⚠ ${esc(f.name)}: ${esc(f.msg)}`);
@@ -8218,6 +8498,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         st.auto = pref.auto === true; // mặc định: camera như app gốc, người dùng tự bấm chụp
         st.native = pref.cam !== 'web'; // mặc định: camera gốc của máy
         renderCamMode();
+        applyTheme();
         $('scAutoBtn').classList.toggle('on', st.auto);
         $('scSettings').classList.toggle('collapsed', !!pref.collapsed);
         $('scanOverlay').classList.add('show');
@@ -8255,6 +8536,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       // Nút "Quay lại" của điện thoại: đóng khung chỉnh góc / trình scan thay vì rời trang.
       window.addEventListener('popstate', () => {
         if (!st.open) return;
+        if (st.uploading) { try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } return; }
         if (st.mode === 'editor') { editCancel(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
         else if ($('scFolderOverlay').classList.contains('show')) { closeFolderPicker(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
         else close(true);
@@ -8270,7 +8552,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       $('scFileName').addEventListener('input', () => { st.nameTouched = true; markDuplicate(); });
 
       return {
-        open, close, setKind, setCamMode, toggleCamMode, login, setSession, clearSession, manualCapture, onFiles, toggleTorch, toggleAuto, toggleSettings,
+        open, close, setKind, setCamMode, toggleCamMode, toggleTheme, login, setSession, clearSession, manualCapture, onFiles, toggleTorch, toggleAuto, toggleSettings,
         showReview, backToCamera, onTypeChange, onPaperChange, updateName, editReset, editRotate, editApply, editCancel,
         openFolderPicker, closeFolderPicker, createFolder, gotoPasted, gotoCommune, chooseCurrentFolder,
         downloadPdf, uploadPdf, copyQr, _st: st // TMPTEST
