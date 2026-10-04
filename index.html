@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TDMAP.PRO.VN-KH113</title>
-  <!-- 041026v2 -->
+  <!-- 041026v3 -->
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index_KH113.html (và manifest.json) trên server  -->
@@ -2536,13 +2536,15 @@
     }
 
     /* Màn kiểm tra sau khi chụp: ảnh gốc có viền cắt + ảnh đã cắt, để xác nhận cắt đúng viền */
+    /* Phủ toàn màn hình (che cả phần thiết lập) để ảnh đã cắt hiện to, rộng bằng màn hình */
     #scConfirm {
-      position: absolute;
+      position: fixed;
       inset: 0;
       display: none;
       flex-direction: column;
       background: #000;
-      z-index: 3;
+      z-index: 20;
+      padding-top: env(safe-area-inset-top);
     }
 
     #scConfirm.show {
@@ -2567,20 +2569,29 @@
       min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding: 8px;
+      gap: 6px;
+      padding: 6px 0;
     }
 
+    /* Ảnh sau khi cắt chiếm phần lớn màn hình (rộng hết bề ngang), ảnh chụp gốc thu nhỏ bên dưới */
     #scConfirm .cf-pane {
-      flex: 1;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      align-items: center;
       gap: 4px;
     }
 
+    #scConfirm .cf-pane.out {
+      flex: 3;
+    }
+
+    #scConfirm .cf-pane.src {
+      flex: 1;
+    }
+
     #scConfirm .cf-pane span {
+      flex-shrink: 0;
+      text-align: center;
       font-size: 11.5px;
       color: #9fb3c3;
     }
@@ -2589,20 +2600,41 @@
     #scConfirm .cf-pane img {
       flex: 1;
       min-height: 0;
-      max-width: 100%;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
       display: block;
-    }
-
-    #scConfirm .cf-pane img {
-      box-shadow: 0 0 0 2px #00c6a7;
-      background: #fff;
     }
 
     @media (orientation: landscape) {
       #scConfirm .cf-body {
         flex-direction: row;
       }
+    }
+
+    #scConfirm .cf-zoom {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      display: none;
+      background: #000;
+      overflow: auto;
+    }
+
+    #scConfirm .cf-zoom.show {
+      display: block;
+    }
+
+    #scConfirm .cf-zoom img {
+      display: block;
+      width: 200%;
+      max-width: none;
+    }
+
+    #scConfirm .cf-zoom button {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      right: 10px;
     }
 
     #scEditCanvas {
@@ -3083,9 +3115,12 @@
       <div id="scConfirm">
         <div class="cf-hd" id="scCfHd">Đang cắt theo viền…</div>
         <div class="cf-body">
-          <div class="cf-pane"><span>Ảnh chụp — viền cắt màu xanh</span><canvas id="scCfSrc"></canvas></div>
-          <div class="cf-pane"><span>Ảnh sau khi cắt</span><img id="scCfOut" alt=""></div>
+          <div class="cf-pane out"><span>Ảnh sau khi cắt — chạm vào ảnh để phóng to</span><img id="scCfOut" alt=""
+              onclick="ScanHS.confirmZoom(true)"></div>
+          <div class="cf-pane src"><span>Ảnh chụp — viền cắt màu xanh</span><canvas id="scCfSrc"></canvas></div>
         </div>
+        <div class="cf-zoom" id="scCfZoom" onclick="ScanHS.confirmZoom(false)"><img id="scCfZoomImg" alt=""><button
+            class="sc-btn primary">✕ Đóng</button></div>
         <div class="sc-row sc-edit-bar">
           <button class="sc-btn" onclick="ScanHS.confirmRetake()">📷 Chụp lại</button>
           <button class="sc-btn" onclick="ScanHS.confirmEdit()">✂️ Chỉnh viền</button>
@@ -8050,7 +8085,14 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       function clearConfirm() {
         clearConfirmUrl();
         $('scCfOut').removeAttribute('src');
+        confirmZoom(false);
         const c = $('scCfSrc'); c.width = c.height = 0;
+      }
+      // Trang chặn chụm 2 ngón để phóng to -> chạm ảnh đã cắt mở bản to gấp đôi, cuộn để soi mép giấy.
+      function confirmZoom(on) {
+        const z = $('scCfZoom'), img = $('scCfZoomImg');
+        if (on && cfUrl) { img.src = cfUrl; z.classList.add('show'); z.scrollTo((img.offsetWidth - z.clientWidth) / 2, 0); }
+        else { z.classList.remove('show'); img.removeAttribute('src'); }
       }
       async function showConfirm(i, back) {
         const p = st.pages[i]; if (!p) { back === 'camera' ? setMode('camera') : showReview(); return; }
@@ -8844,7 +8886,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if (!st.open) return;
         if (st.uploading) { try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } return; }
         if (st.mode === 'editor') { editCancel(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
-        else if (st.mode === 'confirm') { confirmOk(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
+        else if (st.mode === 'confirm') { if ($('scCfZoom').classList.contains('show')) confirmZoom(false); else confirmOk(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
         else if ($('scFolderOverlay').classList.contains('show')) { closeFolderPicker(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
         else close(true);
       });
@@ -8861,7 +8903,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
 
       return {
         open, close, setKind, setCamMode, toggleCamMode, toggleTheme, login, setSession, clearSession, manualCapture, onFiles, toggleTorch, toggleAuto, toggleSettings,
-        showReview, backToCamera, onTypeChange, onPaperChange, updateName, editReset, editRotate, editApply, editCancel, confirmOk, confirmEdit, confirmRetake,
+        showReview, backToCamera, onTypeChange, onPaperChange, updateName, editReset, editRotate, editApply, editCancel, confirmOk, confirmEdit, confirmRetake, confirmZoom,
         openFolderPicker, closeFolderPicker, createFolder, gotoPasted, gotoCommune, chooseCurrentFolder,
         downloadPdf, uploadPdf, copyQr, setQrScan, _st: st // TMPTEST
       };
