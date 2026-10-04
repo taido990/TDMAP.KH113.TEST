@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TDMAP.PRO.VN-KH113</title>
-  <!-- 041026_v1 -->
+  <!-- 041026v2 -->
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index_KH113.html (và manifest.json) trên server  -->
@@ -2535,6 +2535,76 @@
       border-color: #00c6a7;
     }
 
+    /* Màn kiểm tra sau khi chụp: ảnh gốc có viền cắt + ảnh đã cắt, để xác nhận cắt đúng viền */
+    #scConfirm {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      background: #000;
+      z-index: 3;
+    }
+
+    #scConfirm.show {
+      display: flex;
+    }
+
+    #scConfirm .cf-hd {
+      flex-shrink: 0;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #e6eef5;
+      background: #101a24;
+    }
+
+    #scConfirm .cf-hd.warn {
+      color: #ffcc66;
+    }
+
+    #scConfirm .cf-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+    }
+
+    #scConfirm .cf-pane {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    #scConfirm .cf-pane span {
+      font-size: 11.5px;
+      color: #9fb3c3;
+    }
+
+    #scConfirm .cf-pane canvas,
+    #scConfirm .cf-pane img {
+      flex: 1;
+      min-height: 0;
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    #scConfirm .cf-pane img {
+      box-shadow: 0 0 0 2px #00c6a7;
+      background: #fff;
+    }
+
+    @media (orientation: landscape) {
+      #scConfirm .cf-body {
+        flex-direction: row;
+      }
+    }
+
     #scEditCanvas {
       flex: 1;
       min-height: 0;
@@ -3007,6 +3077,19 @@
           <button class="sc-btn" onclick="ScanHS.downloadPdf()">⬇️ Tải về</button>
           <button class="sc-btn green" id="scUploadBtn" style="flex:1;" onclick="ScanHS.uploadPdf()">☁️ Lưu lên thư
             mục</button>
+        </div>
+      </div>
+
+      <div id="scConfirm">
+        <div class="cf-hd" id="scCfHd">Đang cắt theo viền…</div>
+        <div class="cf-body">
+          <div class="cf-pane"><span>Ảnh chụp — viền cắt màu xanh</span><canvas id="scCfSrc"></canvas></div>
+          <div class="cf-pane"><span>Ảnh sau khi cắt</span><img id="scCfOut" alt=""></div>
+        </div>
+        <div class="sc-row sc-edit-bar">
+          <button class="sc-btn" onclick="ScanHS.confirmRetake()">📷 Chụp lại</button>
+          <button class="sc-btn" onclick="ScanHS.confirmEdit()">✂️ Chỉnh viền</button>
+          <button class="sc-btn primary" style="flex:1;" onclick="ScanHS.confirmOk()">✓ Đúng, dùng ảnh</button>
         </div>
       </div>
 
@@ -7825,6 +7908,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             p.via = `${src.width}×${src.height} ${usePhoto ? 'ảnh gốc' : 'khung video'}${found ? '' : ' · cắt theo khung'}`;
           }
           if (!found) setMsg(`Trang ${pi + 1}: không thấy viền giấy — đã cắt theo khung gợi ý, bấm ✂️ để chỉnh nếu cần.`, 'err');
+          if (st.mode === 'camera') showConfirm(pi, 'camera');
         } finally { st.capturing = false; st.lostSince = 0; st.rearmAfter = performance.now() + 1200; refreshHint(); }
       }
       async function captureFromVideo(qn, manual) {
@@ -7872,6 +7956,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           st.blurRetry = 0;
           const pi = addPage(src, q);
           if (st.pages[pi]) st.pages[pi].via = `${src.width}×${src.height} ${via}`;
+          if (st.mode === 'camera') showConfirm(pi, 'camera'); // chụp xong -> xem ảnh đã cắt đúng viền chưa
         } finally { st.capturing = false; st.lostSince = 0; st.rearmAfter = performance.now() + 1200; if (st.armed) st.stableSince = 0; else refreshHint(); }
       }
       function manualCapture() {
@@ -7907,12 +7992,14 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           } catch (e) { setMsg(esc(e.message), 'err'); }
         }
         // Ảnh tự vào file đang làm (không mở khung kéo góc) rồi sang màn xem lại.
-        showReview();
         if (lastAdded >= 0) {
           const file = esc(cleanFileName()) + '.pdf', n = st.pages.length;
           if (undetected) setMsg(`✓ Đã thêm vào <b>${file}</b> (${n} trang) — ${undetected} ảnh không thấy viền giấy nên giữ nguyên ảnh, bấm ✂️ để cắt nếu cần.`, 'err');
           else setMsg(`✓ Đã cắt theo viền và thêm vào <b>${file}</b> (${n} trang). Bấm 📱 Chụp tiếp để thêm trang.`, 'ok');
         }
+        // Một ảnh (vừa chụp) -> hiện ảnh đã cắt để kiểm tra viền; nhiều ảnh -> xem tất cả ở màn xem lại.
+        if (lastAdded >= 0 && files.length === 1) showConfirm(lastAdded, 'review');
+        else showReview();
       }
       function addPage(srcCanvas, quad, silent) {
         const src = limitPixels(srcCanvas);
@@ -7925,7 +8012,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         let idx;
         if (st.retakeIndex >= 0 && st.retakeIndex < st.pages.length) {
           idx = st.retakeIndex; dropPage(st.pages[idx]); st.pages[idx] = page; st.retakeIndex = -1;
-          if (!silent) { queueProcess(page); showReview(); return idx; }
+          if (!silent) { queueProcess(page); showConfirm(idx, 'review'); return idx; }
         } else { st.pages.push(page); idx = st.pages.length - 1; }
         if (!silent && !quad) { openEditor(idx, true); return idx; } // chụp tay không thấy viền -> kéo góc ngay
         queueProcess(page);
@@ -7948,12 +8035,68 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         st.mode = m;
         $('scReview').classList.toggle('show', m === 'review');
         $('scEditor').classList.toggle('show', m === 'editor');
+        $('scConfirm').classList.toggle('show', m === 'confirm');
+        if (m !== 'confirm') clearConfirm();
         $('scBottom').style.display = m === 'camera' ? '' : 'none';
         if (m === 'camera') startCamera();
         else if (m === 'review') stopCamera();
       }
       function showReview() { if (!st.pages.length) { setMode('camera'); return; } setMode('review'); renderGrid(); renderAllFilters(); renderUser(); renderQr(); scanQrPages(); }
       function backToCamera() { st.retakeIndex = -1; setMsg(''); setMode('camera'); }
+
+      // ── KIỂM TRA ẢNH VỪA CHỤP: cắt theo viền xong hiện ảnh gốc (kèm viền cắt) + ảnh đã cắt ─────
+      // để người dùng xác nhận cắt đúng viền; sai thì chỉnh viền hoặc chụp lại. back = màn quay về sau khi xong.
+      let cfUrl = '';
+      function clearConfirm() {
+        clearConfirmUrl();
+        $('scCfOut').removeAttribute('src');
+        const c = $('scCfSrc'); c.width = c.height = 0;
+      }
+      async function showConfirm(i, back) {
+        const p = st.pages[i]; if (!p) { back === 'camera' ? setMode('camera') : showReview(); return; }
+        st.confirm = { page: p, back: back || 'review' };
+        setMode('confirm');
+        const hd = $('scCfHd'); hd.className = 'cf-hd'; hd.textContent = `⏳ Đang cắt theo viền trang ${i + 1}…`;
+        for (let k = 0; k < 5 && !p.done && pageAlive(p); k++) await procChain;
+        if (st.mode !== 'confirm' || !st.confirm || st.confirm.page !== p) return;
+        if (!p.done) { hd.className = 'cf-hd warn'; hd.textContent = '⚠ Không xử lý được ảnh — bấm 📷 Chụp lại.'; return; }
+        try {
+          const [src, blob] = await Promise.all([getSrc(p), getOutBlob(p)]);
+          if (st.mode !== 'confirm' || !st.confirm || st.confirm.page !== p) return;
+          // Ảnh gốc thu nhỏ + tô tối ngoài vùng cắt, viền cắt màu xanh
+          const c = $('scCfSrc'), s = Math.min(1, 1200 / Math.max(src.width, src.height));
+          c.width = Math.round(src.width * s); c.height = Math.round(src.height * s);
+          const x = c.getContext('2d'), q = p.quad.map(([u, v]) => [u * s, v * s]);
+          x.drawImage(src, 0, 0, c.width, c.height);
+          x.beginPath(); x.rect(0, 0, c.width, c.height);
+          q.forEach((pt, j) => j ? x.lineTo(pt[0], pt[1]) : x.moveTo(pt[0], pt[1])); x.closePath();
+          x.fillStyle = 'rgba(0,0,0,0.55)'; x.fill('evenodd');
+          x.beginPath(); q.forEach((pt, j) => j ? x.lineTo(pt[0], pt[1]) : x.moveTo(pt[0], pt[1])); x.closePath();
+          x.lineWidth = Math.max(2, c.width / 250); x.strokeStyle = '#00c6a7'; x.stroke();
+          clearConfirmUrl(); cfUrl = URL.createObjectURL(blob); $('scCfOut').src = cfUrl;
+          hd.className = p.detected ? 'cf-hd' : 'cf-hd warn';
+          hd.textContent = p.detected
+            ? `✓ Đã cắt theo viền trang ${i + 1} — kiểm tra viền xanh có khớp mép giấy không.`
+            : `⚠ Không thấy viền giấy trang ${i + 1} — đang lấy nguyên ảnh, bấm ✂️ Chỉnh viền để cắt.`;
+        } catch (e) { hd.className = 'cf-hd warn'; hd.textContent = '⚠ ' + e.message; }
+      }
+      function clearConfirmUrl() { if (cfUrl) { URL.revokeObjectURL(cfUrl); cfUrl = ''; } }
+      function confirmIdx() { return st.confirm ? st.pages.indexOf(st.confirm.page) : -1; }
+      function confirmOk() {
+        const back = st.confirm ? st.confirm.back : 'review'; st.confirm = null;
+        if (back === 'camera') setMode('camera'); else showReview();
+      }
+      function confirmEdit() { const i = confirmIdx(); if (i < 0) { confirmOk(); return; } openEditor(i, false); }
+      function confirmRetake() {
+        const i = confirmIdx(), back = st.confirm ? st.confirm.back : 'review'; st.confirm = null;
+        if (i < 0) { confirmOk(); return; }
+        st.retakeIndex = i;
+        if (st.native) {
+          // Camera gốc: mở lại app camera ngay; ảnh mới thay vào đúng trang này.
+          if (back === 'camera') setMode('camera'); else showReview();
+          $('scCapInput').click();
+        } else { setMode('camera'); hint(`Chụp lại trang ${i + 1}…`); }
+      }
       function renderGrid() {
         if (st.mode !== 'review') return;
         const g = $('scGrid'); g.innerHTML = '';
@@ -7992,7 +8135,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         try { src = await getSrc(p); } catch (e) { setMsg(esc(e.message), 'err'); return; }
         if (st.pages[i] !== p) return;
         st.edSrc = src;
-        st.editIdx = i; st.editFresh = !!fresh; st.editReturn = st.mode === 'review' ? 'review' : 'camera';
+        st.editIdx = i; st.editFresh = !!fresh; st.editReturn = st.mode === 'review' || st.mode === 'confirm' ? st.mode : 'camera';
         st.edit = { quad: p.quad.map(a => a.slice()), rot: p.rot, filter: p.filter };
         setMode('editor');
         if (st.loop) { cancelAnimationFrame(st.loop); st.loop = 0; }
@@ -8081,14 +8224,19 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           p.quad = q; p.rot = st.edit.rot; p.filter = st.edit.filter; p.detected = true;
           queueProcess(p);
         }
-        const back = st.editReturn; st.editIdx = -1; st.ed = null; st.edSrc = null;
-        if (back === 'review') showReview(); else setMode('camera');
+        const back = st.editReturn, idx = st.editIdx; st.editIdx = -1; st.ed = null; st.edSrc = null;
+        // Chỉnh viền xong -> quay lại màn kiểm tra (vừa chụp từ camera trong trang thì cũng kiểm tra luôn).
+        if (back === 'confirm' && st.confirm) showConfirm(idx, st.confirm.back);
+        else if (back === 'review') showReview();
+        else if (p) showConfirm(idx, 'camera');
+        else setMode('camera');
       }
       function editCancel() {
         // Vừa chụp tay mà bấm Hủy ở khung chỉnh góc -> coi như bỏ ảnh đó (chụp lại).
         if (st.editFresh && st.pages[st.editIdx] && !st.pages[st.editIdx].done) { dropPage(st.pages.splice(st.editIdx, 1)[0]); refreshCount(); }
-        const back = st.editReturn; st.editIdx = -1; st.ed = null; st.edSrc = null;
-        if (back === 'review' && st.pages.length) showReview(); else setMode('camera');
+        const back = st.editReturn, idx = st.editIdx; st.editIdx = -1; st.ed = null; st.edSrc = null;
+        if (back === 'confirm' && st.confirm && st.pages[idx]) showConfirm(idx, st.confirm.back);
+        else if (back !== 'camera' && st.pages.length) showReview(); else setMode('camera');
       }
 
       // ── ĐỌC MÃ QR TRÊN CCCD (lấy thông tin chủ) ──────────────────────────────────
@@ -8248,7 +8396,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         st.curKey = key; st.retakeIndex = -1;
         refreshCount();
         if (st.mode === 'review') { if (st.pages.length) showReview(); else setMode('camera'); }
-        else if (st.mode === 'editor') { st.ed = null; st.edSrc = null; st.editIdx = -1; setMode(st.pages.length ? 'review' : 'camera'); if (st.pages.length) showReview(); }
+        else if (st.mode === 'editor' || st.mode === 'confirm') { st.ed = null; st.edSrc = null; st.editIdx = -1; st.confirm = null; setMode(st.pages.length ? 'review' : 'camera'); if (st.pages.length) showReview(); }
       }
       function onTypeChange() {
         swapPageSet();
@@ -8696,6 +8844,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if (!st.open) return;
         if (st.uploading) { try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } return; }
         if (st.mode === 'editor') { editCancel(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
+        else if (st.mode === 'confirm') { confirmOk(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
         else if ($('scFolderOverlay').classList.contains('show')) { closeFolderPicker(); try { history.pushState({ tdmapScan: 1 }, ''); } catch (e) { } }
         else close(true);
       });
@@ -8712,7 +8861,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
 
       return {
         open, close, setKind, setCamMode, toggleCamMode, toggleTheme, login, setSession, clearSession, manualCapture, onFiles, toggleTorch, toggleAuto, toggleSettings,
-        showReview, backToCamera, onTypeChange, onPaperChange, updateName, editReset, editRotate, editApply, editCancel,
+        showReview, backToCamera, onTypeChange, onPaperChange, updateName, editReset, editRotate, editApply, editCancel, confirmOk, confirmEdit, confirmRetake,
         openFolderPicker, closeFolderPicker, createFolder, gotoPasted, gotoCommune, chooseCurrentFolder,
         downloadPdf, uploadPdf, copyQr, setQrScan, _st: st // TMPTEST
       };
