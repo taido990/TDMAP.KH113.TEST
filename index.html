@@ -2939,7 +2939,8 @@
       <button class="sc-iconbtn" id="scCamBtn" onclick="ScanHS.toggleCamMode()" title="Đổi camera">🎥</button>
       <button class="sc-iconbtn" id="scAutoBtn" onclick="ScanHS.toggleAuto()"
         title="Tự động chụp khi nhận diện được tờ giấy">AUTO</button>
-      <button class="sc-iconbtn" id="scThemeBtn" onclick="ScanHS.toggleTheme()" title="Bật/tắt giao diện tối">☀️</button>
+      <button class="sc-iconbtn" id="scThemeBtn" onclick="ScanHS.toggleTheme()"
+        title="Bật/tắt giao diện tối">☀️</button>
       <button class="sc-iconbtn" onclick="ScanHS.toggleSettings()" title="Ẩn/hiện thiết lập">⚙️</button>
     </div>
     <div class="sc-settings" id="scSettings">
@@ -6975,8 +6976,8 @@ body.hide-lbl-bg .lbl-style {
       const FOLDER_KEY = 'tdmap_scan_folder_v1';     // thư mục lưu gần nhất theo từng mã xã
       const PREF_KEY = 'tdmap_scan_pref_v1';         // tự động chụp / thu gọn thiết lập
       const OPENCV_URLS = [
-        'https://docs.opencv.org/4.10.0/opencv.js',
-        'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js'
+        'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js',
+        'https://docs.opencv.org/4.10.0/opencv.js' // dự phòng (hay bị chặn CORP/403)
       ];
       // Bộ đọc mã QR (zxing-cpp bản WebAssembly) - đọc được QR nhỏ in trên CCCD sau khi phóng to + làm nét.
       const ZXING_URL = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.0/dist/iife/reader/index.js';
@@ -7020,6 +7021,122 @@ body.hide-lbl-bg .lbl-style {
       };
       let cvPromise = null;
       let procChain = Promise.resolve();
+      // ── LƯU TẠM ẢNH SCAN XUỐNG MÁY (IndexedDB) ───────────────────────────────────
+      // Ảnh 12MP để dạng canvas tốn ~48MB RAM/trang -> nhiều trang dễ làm trình duyệt điện thoại đóng tab.
+      // Mỗi trang chỉ giữ canvas trong lúc xử lý; xong thì ảnh gốc + ảnh đã cắt được cất thành file JPEG trên
+      // máy (IndexedDB), khi cần (chỉnh góc, đọc QR, tạo PDF để up) mới đọc lại. Danh sách trang cũng được ghi
+      // lại -> tab bị đóng/tải lại vẫn còn các trang chưa lưu. Lưu lên Drive xong (hoặc xóa trang) thì xóa file tạm.
+      // Máy không cho dùng IndexedDB -> giữ file JPEG trong bộ nhớ (vẫn nhẹ hơn canvas nhiều lần).
+      const idb = (() => {
+        let dbP = null; const mem = new Map();
+        const open = () => dbP || (dbP = new Promise(res => {
+          try {
+            const r = indexedDB.open('tdmap_scan_v1', 1);
+            r.onupgradeneeded = () => { r.result.createObjectStore('blob'); r.result.createObjectStore('meta'); };
+            r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null);
+          } catch (e) { res(null); }
+        }));
+        const tx = async (store, mode, fn) => {
+          const db = await open(); if (!db) throw new Error('no-idb');
+          return new Promise((res, rej) => {
+            try {
+              const t = db.transaction(store, mode), req = fn(t.objectStore(store));
+              t.oncomplete = () => res(req.result); t.onerror = t.onabort = () => rej(t.error || new Error('IndexedDB lỗi'));
+            } catch (e) { rej(e); }
+          });
+        };
+        return {
+          async put(store, k, v) {
+            try { await tx(store, 'readwrite', s => s.put(v, k)); mem.delete(store + '/' + k); }
+            catch (e) { if (e.message !== 'no-idb') console.warn('[Scan] lưu tạm trên máy lỗi, giữ trong bộ nhớ:', e.message); mem.set(store + '/' + k, v); }
+          },
+          async get(store, k) { if (mem.has(store + '/' + k)) return mem.get(store + '/' + k); try { return await tx(store, 'readonly', s => s.get(k)); } catch (e) { return undefined; } },
+          async del(store, k) { mem.delete(store + '/' + k); try { await tx(store, 'readwrite', s => s.delete(k)); } catch (e) { } },
+          async keys(store) { let k = []; try { k = (await tx(store, 'readonly', s => s.getAllKeys())) || []; } catch (e) { } return k.concat([...mem.keys()].filter(x => x.startsWith(store + '/')).map(x => x.slice(store.length + 1))); }
+        };
+      })();
+      let pageSeq = Date.now();
+      const toBlob = (c, q) => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Không mã hoá được ảnh (máy thiếu bộ nhớ?)')), 'image/jpeg', q));
+      async function blobToCanvas(blob, w, h) {
+        const url = URL.createObjectURL(blob);
+        try {
+          const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Không đọc được ảnh lưu tạm')); i.src = url; });
+          const c = document.createElement('canvas'); c.width = w || img.naturalWidth; c.height = h || img.naturalHeight;
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          return c;
+        } finally { URL.revokeObjectURL(url); }
+      }
+      const outQ = p => p.filter === 'bw' ? 0.85 : 0.95; // chất lượng JPEG ảnh trang (cũng là ảnh nhúng PDF)
+      async function getSrc(p) {
+        if (p.src) return p.src;
+        const b = await idb.get('blob', p.id + ':src');
+        if (!b) throw new Error('Mất ảnh gốc lưu tạm của trang — bấm 📷 chụp lại trang này.');
+        return blobToCanvas(b, p.srcW, p.srcH);
+      }
+      async function getOutBlob(p) {
+        const b = await idb.get('blob', p.id + ':out');
+        if (!b) throw new Error('Mất ảnh lưu tạm của trang — bấm 📷 chụp lại trang này.');
+        return b;
+      }
+      async function getOut(p) { return blobToCanvas(await getOutBlob(p), p.outW, p.outH); }
+      const pageAlive = p => st.pages.includes(p) || Object.values(st.sets).some(s => s.includes(p));
+      // Khổ giấy của trang: trang của loại đang mở theo ô Khổ giấy, trang của loại khác theo khổ mặc định của loại đó.
+      function paperOfPage(p) {
+        if (st.pages.includes(p)) return paperKey();
+        const k = Object.keys(st.sets).find(k => k !== st.curKey && st.sets[k].includes(p));
+        return k ? (TYPES.find(t => t.v === k.split(':')[1]) || TYPES[0]).paper : paperKey();
+      }
+      // Xử lý trang (cắt, xoay, lọc) rồi cất ảnh gốc + ảnh đã cắt xuống máy, bỏ canvas khỏi bộ nhớ.
+      async function processAndStore(page, pk) {
+        const out = processPage(page, pk || paperOfPage(page), await getSrc(page));
+        if (page.src) {
+          await idb.put('blob', page.id + ':src', page.srcBlob || await toBlob(page.src, 0.95));
+          page.src = null; page.srcBlob = null;
+        }
+        await idb.put('blob', page.id + ':out', await toBlob(out, outQ(page)));
+        page.done = true;
+        saveManifest();
+      }
+      function dropPage(p) {
+        if (!p) return;
+        p.src = null; p.srcBlob = null; p.done = false;
+        idb.del('blob', p.id + ':src'); idb.del('blob', p.id + ':out');
+      }
+      const allPages = () => [...new Set(st.pages.concat(...Object.values(st.sets)))];
+      // Danh sách trang chưa lưu (để mở lại sau khi tab bị đóng).
+      const META_FIELDS = ['id', 'quad', 'rot', 'filter', 'detected', 'via', 'sharp', 'srcW', 'srcH', 'outW', 'outH', 'thumb', 'qrText', 'pk'];
+      let manT = 0, restored = false;
+      function saveManifest() {
+        if (!restored) return;
+        clearTimeout(manT);
+        manT = setTimeout(() => {
+          const all = Object.assign({}, st.sets); if (st.curKey) all[st.curKey] = st.pages;
+          const sets = {};
+          for (const [k, v] of Object.entries(all)) {
+            const ps = v.filter(p => p.done).map(p => { const o = {}; META_FIELDS.forEach(f => { o[f] = p[f]; }); return o; });
+            if (ps.length) sets[k] = ps;
+          }
+          idb.put('meta', 'pages', { sets, lastParcel: st.lastParcel, at: Date.now() });
+        }, 300);
+      }
+      async function restorePages() {
+        try {
+          const m = await idb.get('meta', 'pages'), have = new Set((await idb.keys('blob')).map(String)), keep = new Set();
+          if (m && m.sets) {
+            for (const [k, list] of Object.entries(m.sets)) {
+              const ps = (list || []).filter(o => o && o.id && have.has(o.id + ':src') && have.has(o.id + ':out'))
+                .map(o => Object.assign({ src: null, srcBlob: null, done: true, qr: o.qrText ? (parseCccdQr(o.qrText) || { raw: o.qrText }) : undefined }, o));
+              if (ps.length) { st.sets[k] = ps; ps.forEach(p => keep.add(p.id)); }
+            }
+            st.lastParcel = m.lastParcel || '';
+          }
+          // Dọn file tạm không còn thuộc trang nào (trang đã xóa / đã lưu khi tab bị đóng giữa chừng).
+          have.forEach(key => { if (!keep.has(key.split(':')[0])) idb.del('blob', key); });
+          const n = keep.size;
+          if (n) console.log('[Scan] khôi phục', n, 'trang scan chưa lưu từ lần trước');
+        } catch (e) { console.warn('[Scan] khôi phục trang lưu tạm:', e.message); }
+        restored = true;
+      }
       const detCanvas = document.createElement('canvas');
 
       // ── TIỆN ÍCH ───────────────────────────────────────────────────────────────
@@ -7293,7 +7410,7 @@ body.hide-lbl-bg .lbl-style {
       // Trước khi lưu: còn trang nhòe thì hỏi lại.
       async function confirmSharp() {
         await procChain;
-        for (const p of st.pages) if (!p.out) processPage(p);
+        for (const p of st.pages) if (!p.done) await processAndStore(p);
         const bad = st.pages.map((p, i) => isBlurry(p) ? i + 1 : 0).filter(Boolean);
         if (!bad.length) return true;
         return confirm(`Trang ${bad.join(', ')} có thể bị nhòe (chữ không rõ).
@@ -7337,29 +7454,31 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         }
         ctx.putImageData(img, 0, 0);
       }
-      function processPage(page) {
-        const paper = PAPER[paperKey()];
+      function processPage(page, pk, src) {
+        page.pk = pk || paperKey();
+        const paper = PAPER[page.pk];
         const [qw, qh] = quadDims(page.quad);
         // Giữ nguyên độ phân giải ảnh gốc: cạnh dài ảnh lưu = cạnh dài vùng giấy trong ảnh gốc
         // (không phóng to / thu nhỏ), cạnh ngắn theo đúng tỉ lệ khổ giấy; chiều dọc/ngang như lúc chụp.
         const long = Math.max(1, Math.round(Math.max(qw, qh))), ratio = Math.min(paper.w, paper.h) / Math.max(paper.w, paper.h);
         const short = Math.max(1, Math.round(long * ratio));
         const [ow, oh] = qw >= qh ? [long, short] : [short, long];
-        let out = warp(page.src, page.quad, ow, oh);
+        let out = warp(src, page.quad, ow, oh);
         out = rotateCanvas(out, page.rot);
         page.sharp = sharpScore(out);
         console.log('[Scan] độ nét', Math.round(page.sharp));
         applyFilter(out, page.filter);
-        page.out = out;
+        page.outW = out.width; page.outH = out.height;
         const t = limitSize(out, 360);
         page.thumb = t.toDataURL('image/jpeg', 0.75);
+        return out;
       }
       function queueProcess(page) {
-        page.out = null; page.thumb = ''; page.qr = undefined;
+        page.done = false; page.thumb = ''; page.qr = undefined; page.qrText = '';
         renderGrid(); refreshCount();
         procChain = procChain
           .then(() => new Promise(r => setTimeout(r, 30)))
-          .then(() => { if (st.pages.includes(page)) processPage(page); })
+          .then(() => pageAlive(page) ? processAndStore(page) : dropPage(page))
           .catch(e => { console.error('[Scan] xử lý trang lỗi', e); setMsg('Lỗi xử lý ảnh: ' + esc(e.message), 'err'); })
           .then(() => { renderGrid(); refreshCount(); scanQrPages(); });
         return procChain;
@@ -7635,6 +7754,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           const bmp = await createImageBitmap(blob);
           const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
           c.getContext('2d').drawImage(bmp, 0, 0); bmp.close && bmp.close();
+          c._blob = blob;
           return c;
         } catch (e) { console.warn('[Scan] takePhoto:', e.message); return null; }
       }
@@ -7769,6 +7889,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             const c0 = document.createElement('canvas'); c0.width = img.naturalWidth; c0.height = img.naturalHeight;
             c0.getContext('2d').drawImage(img, 0, 0);
             URL.revokeObjectURL(url);
+            if (/^image\/(jpeg|png|webp)$/i.test(f.type)) c0._blob = f;
             const c = limitPixels(c0);
             // Dò viền trên cả ảnh, rồi dò lại trong vùng giữa ảnh; không thấy thì lấy nguyên ảnh (không mở khung kéo góc).
             const [bx, by, bw, bh] = guideBox(c.width, c.height);
@@ -7778,6 +7899,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             lastAdded = addPage(c, q || defaultQuad(c, 0), true);
             const pg = st.pages[lastAdded];
             if (pg) { pg.detected = !!q; pg.via = `${c.width}×${c.height} ${input.id === 'scCapInput' ? 'camera gốc' : 'ảnh chọn'}${q ? '' : ' · nguyên ảnh'}`; }
+            if (files.length > 1) setMsg(`⏳ Đang xử lý ảnh ${files.indexOf(f) + 1}/${files.length}…`);
+            await procChain; // xử lý + cất xuống máy xong mới đọc ảnh tiếp theo
           } catch (e) { setMsg(esc(e.message), 'err'); }
         }
         // Ảnh tự vào file đang làm (không mở khung kéo góc) rồi sang màn xem lại.
@@ -7792,12 +7915,13 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         const src = limitPixels(srcCanvas);
         const s = src.width / srcCanvas.width;
         const page = {
-          src, rot: 0, filter: st.defaultFilter, out: null, thumb: '', detected: !!quad,
+          id: 'p' + (++pageSeq), src, srcBlob: src === srcCanvas ? srcCanvas._blob || null : null, srcW: src.width, srcH: src.height,
+          rot: 0, filter: st.defaultFilter, done: false, thumb: '', detected: !!quad,
           quad: quad ? quad.map(([x, y]) => [x * s, y * s]) : defaultQuad(src)
         };
         let idx;
         if (st.retakeIndex >= 0 && st.retakeIndex < st.pages.length) {
-          idx = st.retakeIndex; st.pages[idx] = page; st.retakeIndex = -1;
+          idx = st.retakeIndex; dropPage(st.pages[idx]); st.pages[idx] = page; st.retakeIndex = -1;
           if (!silent) { queueProcess(page); showReview(); return idx; }
         } else { st.pages.push(page); idx = st.pages.length - 1; }
         if (!silent && !quad) { openEditor(idx, true); return idx; } // chụp tay không thấy viền -> kéo góc ngay
@@ -7811,6 +7935,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         $('scUploadBtn').textContent = nf > 1 ? `☁️ Lưu tất cả (${nf} file)` : '☁️ Lưu lên thư mục';
         $('scCount').textContent = n;
         $('scDoneBtn').disabled = !n;
+        saveManifest();
         const last = st.pages[n - 1];
         $('scThumbBtn').style.backgroundImage = last && last.thumb ? `url('${last.thumb}')` : 'none';
       }
@@ -7832,7 +7957,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if (!st.pages.length) { g.innerHTML = '<div class="sc-empty">Chưa có trang nào. Bấm “＋ Thêm trang” để scan.</div>'; return; }
         st.pages.forEach((p, i) => {
           const card = document.createElement('div'); card.className = 'sc-card';
-          card.innerHTML = `<div class="img" style="${p.thumb ? `background-image:url('${p.thumb}')` : ''}">${p.thumb ? '' : '<span class="busy">Đang xử lý…</span>'}<span class="num">${i + 1}</span>${p.out ? `<span class="res" title="Ảnh nguồn → ảnh lưu vào PDF">${esc(p.via || '')}${p.via ? ' → ' : ''}${p.out.width}×${p.out.height}</span>` : ''}${isBlurry(p) ? '<span class="blur" title="Ảnh có thể bị nhòe — bấm 📷 để chụp lại">⚠ Nhòe</span>' : ''}</div>
+          card.innerHTML = `<div class="img" style="${p.thumb ? `background-image:url('${p.thumb}')` : ''}">${p.thumb ? '' : '<span class="busy">Đang xử lý…</span>'}<span class="num">${i + 1}</span>${p.done ? `<span class="res" title="Ảnh nguồn → ảnh lưu vào PDF">${esc(p.via || '')}${p.via ? ' → ' : ''}${p.outW}×${p.outH}</span>` : ''}${isBlurry(p) ? '<span class="blur" title="Ảnh có thể bị nhòe — bấm 📷 để chụp lại">⚠ Nhòe</span>' : ''}</div>
             <div class="acts"><button data-a="edit" title="Cắt / chỉnh góc / bộ lọc">✂️</button><button data-a="rot" title="Xoay 90°">⟳</button><button data-a="left" title="Đưa lên trước">◀</button><button data-a="right" title="Đưa ra sau">▶</button><button data-a="retake" title="Chụp lại trang này">📷</button><button data-a="del" title="Xóa trang">🗑</button></div>`;
           card.querySelector('.img').onclick = () => openEditor(i, false);
           card.querySelectorAll('button').forEach(b => b.onclick = () => pageAction(i, b.dataset.a));
@@ -7843,10 +7968,10 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         const p = st.pages[i]; if (!p) return;
         if (a === 'edit') openEditor(i, false);
         else if (a === 'rot') { p.rot = (p.rot + 90) % 360; queueProcess(p); }
-        else if (a === 'left' && i > 0) { [st.pages[i - 1], st.pages[i]] = [st.pages[i], st.pages[i - 1]]; renderGrid(); }
-        else if (a === 'right' && i < st.pages.length - 1) { [st.pages[i + 1], st.pages[i]] = [st.pages[i], st.pages[i + 1]]; renderGrid(); }
+        else if (a === 'left' && i > 0) { [st.pages[i - 1], st.pages[i]] = [st.pages[i], st.pages[i - 1]]; renderGrid(); saveManifest(); }
+        else if (a === 'right' && i < st.pages.length - 1) { [st.pages[i + 1], st.pages[i]] = [st.pages[i], st.pages[i + 1]]; renderGrid(); saveManifest(); }
         else if (a === 'retake') { st.retakeIndex = i; setMode('camera'); hint(`Chụp lại trang ${i + 1}…`); }
-        else if (a === 'del') { if (confirm(`Xóa trang ${i + 1}?`)) { st.pages.splice(i, 1); refreshCount(); if (st.pages.length) renderGrid(); else backToCamera(); } }
+        else if (a === 'del') { if (confirm(`Xóa trang ${i + 1}?`)) { dropPage(st.pages.splice(i, 1)[0]); refreshCount(); if (st.pages.length) renderGrid(); else backToCamera(); } }
       }
       function chips(el, cur, onPick) {
         el.innerHTML = FILTERS.map(([v, l]) => `<button class="sc-chip${v === cur ? ' on' : ''}" data-v="${v}">${l}</button>`).join('');
@@ -7858,8 +7983,12 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       }
 
       // ── KHUNG CHỈNH 4 GÓC (kéo góc, có kính lúp) ─────────────────────────────────
-      function openEditor(i, fresh) {
+      async function openEditor(i, fresh) {
         const p = st.pages[i]; if (!p) return;
+        let src;
+        try { src = await getSrc(p); } catch (e) { setMsg(esc(e.message), 'err'); return; }
+        if (st.pages[i] !== p) return;
+        st.edSrc = src;
         st.editIdx = i; st.editFresh = !!fresh; st.editReturn = st.mode === 'review' ? 'review' : 'camera';
         st.edit = { quad: p.quad.map(a => a.slice()), rot: p.rot, filter: p.filter };
         setMode('editor');
@@ -7875,17 +8004,17 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if (st.mode !== 'editor') return;
         const c = $('scEditCanvas'), dpr = window.devicePixelRatio || 1, r = c.getBoundingClientRect();
         c.width = Math.max(1, Math.round(r.width * dpr)); c.height = Math.max(1, Math.round(r.height * dpr));
-        const p = st.pages[st.editIdx], pad = 26 * dpr;
-        const s = Math.min((c.width - 2 * pad) / p.src.width, (c.height - 2 * pad) / p.src.height);
-        st.ed = { s, ox: (c.width - p.src.width * s) / 2, oy: (c.height - p.src.height * s) / 2, dpr, drag: -1 };
+        const S = st.edSrc, pad = 26 * dpr; if (!S) return;
+        const s = Math.min((c.width - 2 * pad) / S.width, (c.height - 2 * pad) / S.height);
+        st.ed = { s, ox: (c.width - S.width * s) / 2, oy: (c.height - S.height * s) / 2, dpr, drag: -1 };
         drawEditor();
       }
       function drawEditor() {
-        const c = $('scEditCanvas'), x = c.getContext('2d'), p = st.pages[st.editIdx], e = st.ed;
-        if (!p || !e) return;
+        const c = $('scEditCanvas'), x = c.getContext('2d'), S = st.edSrc, e = st.ed;
+        if (!S || !e) return;
         const sp = st.edit.quad.map(([u, v]) => [e.ox + u * e.s, e.oy + v * e.s]);
         x.fillStyle = '#000'; x.fillRect(0, 0, c.width, c.height);
-        x.drawImage(p.src, e.ox, e.oy, p.src.width * e.s, p.src.height * e.s);
+        x.drawImage(S, e.ox, e.oy, S.width * e.s, S.height * e.s);
         x.beginPath(); x.rect(0, 0, c.width, c.height);
         sp.forEach((q, i) => i ? x.lineTo(q[0], q[1]) : x.moveTo(q[0], q[1])); x.closePath();
         x.fillStyle = 'rgba(0,0,0,0.5)'; x.fill('evenodd');
@@ -7902,7 +8031,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           const half = R / (e.s * z);
           x.save(); x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.clip();
           x.fillStyle = '#000'; x.fillRect(cx - R, cy - R, 2 * R, 2 * R);
-          x.drawImage(p.src, u - half, v - half, 2 * half, 2 * half, cx - R, cy - R, 2 * R, 2 * R);
+          x.drawImage(S, u - half, v - half, 2 * half, 2 * half, cx - R, cy - R, 2 * R, 2 * R);
           x.strokeStyle = '#ff5252'; x.lineWidth = 1.5 * e.dpr;
           x.beginPath(); x.moveTo(cx - R, cy); x.lineTo(cx + R, cy); x.moveTo(cx, cy - R); x.lineTo(cx, cy + R); x.stroke();
           x.restore();
@@ -7922,8 +8051,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         });
         c.addEventListener('pointermove', ev => {
           const e = st.ed; if (!e || e.drag < 0) return;
-          const [px, py] = edPoint(ev), p = st.pages[st.editIdx];
-          st.edit.quad[e.drag] = [Math.min(p.src.width, Math.max(0, (px - e.ox) / e.s)), Math.min(p.src.height, Math.max(0, (py - e.oy) / e.s))];
+          const [px, py] = edPoint(ev), S = st.edSrc; if (!S) return;
+          st.edit.quad[e.drag] = [Math.min(S.width, Math.max(0, (px - e.ox) / e.s)), Math.min(S.height, Math.max(0, (py - e.oy) / e.s))];
           drawEditor();
         });
         const end = () => { if (st.ed && st.ed.drag >= 0) { st.ed.drag = -1; drawEditor(); } };
@@ -7931,12 +8060,12 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         window.addEventListener('resize', () => { if (st.open && st.mode === 'editor') layoutEditor(); });
       }
       function editReset(auto) {
-        const p = st.pages[st.editIdx]; if (!p) return;
+        const S = st.edSrc; if (!S) return;
         if (auto) {
-          const q = detectOnLarge(p.src);
+          const q = detectOnLarge(S);
           if (!q) { alert(st.cvState === 'ready' ? 'Không nhận diện được viền giấy trong ảnh này — hãy kéo 4 góc thủ công.' : 'Bộ nhận diện chưa tải xong/không tải được — hãy kéo 4 góc thủ công.'); return; }
           st.edit.quad = q;
-        } else st.edit.quad = defaultQuad(p.src, 0);
+        } else st.edit.quad = defaultQuad(S, 0);
         drawEditor();
       }
       function editRotate() { st.edit.rot = (st.edit.rot + 90) % 360; $('scEditRotBtn').textContent = '⟳ ' + st.edit.rot + '°'; }
@@ -7949,13 +8078,13 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           p.quad = q; p.rot = st.edit.rot; p.filter = st.edit.filter; p.detected = true;
           queueProcess(p);
         }
-        const back = st.editReturn; st.editIdx = -1; st.ed = null;
+        const back = st.editReturn; st.editIdx = -1; st.ed = null; st.edSrc = null;
         if (back === 'review') showReview(); else setMode('camera');
       }
       function editCancel() {
         // Vừa chụp tay mà bấm Hủy ở khung chỉnh góc -> coi như bỏ ảnh đó (chụp lại).
-        if (st.editFresh && st.pages[st.editIdx] && !st.pages[st.editIdx].out) { st.pages.splice(st.editIdx, 1); refreshCount(); }
-        const back = st.editReturn; st.editIdx = -1; st.ed = null;
+        if (st.editFresh && st.pages[st.editIdx] && !st.pages[st.editIdx].done) { dropPage(st.pages.splice(st.editIdx, 1)[0]); refreshCount(); }
+        const back = st.editReturn; st.editIdx = -1; st.ed = null; st.edSrc = null;
         if (back === 'review' && st.pages.length) showReview(); else setMode('camera');
       }
 
@@ -8015,14 +8144,15 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       const QR_FIELDS = [['so', 'Số CCCD'], ['cmnd', 'Số CMND cũ'], ['ten', 'Họ và tên'], ['ngaySinh', 'Ngày sinh'], ['gioiTinh', 'Giới tính'], ['diaChi', 'Nơi thường trú'], ['ngayCap', 'Ngày cấp']];
       async function scanQrPages() {
         if (st.qrBusy || paperKey() !== 'card') { renderQr(); return; }
-        const p = st.pages.find(x => x.out && x.qr === undefined);
+        const p = st.pages.find(x => x.done && x.qr === undefined);
         if (!p) { renderQr(); return; }
         st.qrBusy = true; p.qr = 'busy'; renderQr();
         try {
-          const text = await decodeQr(p.out);
+          const text = await decodeQr(await getOut(p));
           p.qrText = text || '';
           p.qr = text ? (parseCccdQr(text) || { raw: text }) : null;
           console.log('[Scan] QR:', text);
+          saveManifest();
         } catch (e) { console.warn('[Scan] QR lỗi:', e.message); p.qr = null; }
         finally { st.qrBusy = false; }
         scanQrPages();
@@ -8038,7 +8168,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             + (q.raw ? `<div>${esc(q.raw)}</div>` : `<table>${QR_FIELDS.map(([k, l]) => `<tr><td>${l}</td><td>${esc(q[k] || '—')}</td></tr>`).join('')}</table>`);
           return;
         }
-        if (st.pages.some(p => p.qr === 'busy' || (p.out && p.qr === undefined) || !p.out)) { el.className = 'sc-qr'; el.innerHTML = '⏳ Đang đọc mã QR trên CCCD…'; return; }
+        if (st.pages.some(p => p.qr === 'busy' || (p.done && p.qr === undefined) || !p.done)) { el.className = 'sc-qr'; el.innerHTML = '⏳ Đang đọc mã QR trên CCCD…'; return; }
         el.className = 'sc-qr warn';
         el.innerHTML = '⚠ Không đọc được mã QR — chụp lại mặt trước rõ hơn (dùng 📱 Camera gốc, đủ sáng, không lóa).';
       }
@@ -8111,7 +8241,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         st.curKey = key; st.retakeIndex = -1;
         refreshCount();
         if (st.mode === 'review') { if (st.pages.length) showReview(); else setMode('camera'); }
-        else if (st.mode === 'editor') { st.ed = null; st.editIdx = -1; setMode(st.pages.length ? 'review' : 'camera'); if (st.pages.length) showReview(); }
+        else if (st.mode === 'editor') { st.ed = null; st.edSrc = null; st.editIdx = -1; setMode(st.pages.length ? 'review' : 'camera'); if (st.pages.length) showReview(); }
       }
       function onTypeChange() {
         swapPageSet();
@@ -8121,7 +8251,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if ($('scPaper').value !== t.paper) { $('scPaper').value = t.paper; onPaperChange(); }
         updateName();
       }
-      function onPaperChange() { st.pages.forEach(p => queueProcess(p)); }
+      // Chỉ xử lý lại trang đã cắt theo khổ khác (vd mở lại sau khi khôi phục trang lưu tạm thì không phải làm lại).
+      function onPaperChange() { st.pages.forEach(p => { if (!p.done || p.pk !== paperKey()) queueProcess(p); }); }
 
       // ── PHIÊN ĐĂNG NHẬP (để lưu lên Drive) ─────────────────────────────────────────
       function getSession() { const s = readJson(SESSION_KEY, null); return s && s.token && s.exp > Date.now() ? s : null; }
@@ -8136,7 +8267,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         writeJson(SESSION_KEY, { token: data.sessionToken, exp: data.sessionExp || (Date.now() + 11 * 3600e3), email: data.email || '', maXa: data.maXa || '', tenXa: data.tenXa || '' });
         renderUser();
         if (st.open) {
-          if (!st.folder) restoreFolder();
+          if (!st.folder && !st.pendingFolder && !st.lastParcel) restoreFolder(); // scan gắn thửa: chỉ dùng thư mục của thửa đó
           renderFolder(); verifyFolder();
           if (st.loginFromScan) { st.loginFromScan = false; try { closeDriveModal(); } catch (e) { } }
         }
@@ -8290,10 +8421,17 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       }
 
       // ── XUẤT PDF + LƯU ────────────────────────────────────────────────────────────
-      async function buildPdf() {
+      async function buildPdf(qual) {
+        qual = qual || 0.95;
         const jsPDF = await ensureJsPdf();
         await procChain;
-        for (const p of st.pages) if (!p.out) processPage(p);
+        for (const p of st.pages) if (!p.done) await processAndStore(p);
+        // Ảnh trang nhúng PDF: dùng thẳng file JPEG đã lưu tạm trên máy; cần nén mạnh hơn mới mã hoá lại.
+        const jpg = async p => {
+          const q = p.filter === 'bw' ? Math.min(0.85, qual) : qual;
+          const b = q >= outQ(p) ? await getOutBlob(p) : await toBlob(await getOut(p), q);
+          return new Uint8Array(await b.arrayBuffer());
+        };
         const key = paperKey(), paper = PAPER[key], s = getSession();
         let doc = null;
         if (key === 'card') {
@@ -8301,24 +8439,24 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           // (như A4 ngang) để phần mềm đọc PDF (vd quét mã QR CCCD) chuyển trang thành ảnh ở độ phân giải
           // thường vẫn đủ lớn để đọc được QR; ảnh nhúng vẫn giữ nguyên độ phân giải gốc.
           const CARD_PAGE_LONG = 297;
-          st.pages.forEach(p => {
-            const land = p.out.width >= p.out.height;
-            const r = Math.min(p.out.width, p.out.height) / Math.max(p.out.width, p.out.height);
+          for (const p of st.pages) {
+            const land = p.outW >= p.outH;
+            const r = Math.min(p.outW, p.outH) / Math.max(p.outW, p.outH);
             const W = land ? CARD_PAGE_LONG : CARD_PAGE_LONG * r, H = land ? CARD_PAGE_LONG * r : CARD_PAGE_LONG;
             const orient = land ? 'landscape' : 'portrait';
             if (!doc) doc = new jsPDF({ unit: 'mm', format: [W, H], orientation: orient, compress: true });
             else doc.addPage([W, H], orient);
-            doc.addImage(p.out.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, W, H, undefined, 'FAST');
-          });
+            doc.addImage(await jpg(p), 'JPEG', 0, 0, W, H, undefined, 'FAST');
+          }
         } else {
           const fmt = key.toLowerCase();
-          st.pages.forEach(p => {
-            const land = p.out.width > p.out.height, W = land ? paper.h : paper.w, H = land ? paper.w : paper.h;
+          for (const p of st.pages) {
+            const land = p.outW > p.outH, W = land ? paper.h : paper.w, H = land ? paper.w : paper.h;
             const orient = land ? 'landscape' : 'portrait';
             if (!doc) doc = new jsPDF({ unit: 'mm', format: fmt, orientation: orient, compress: true });
             else doc.addPage(fmt, orient);
-            doc.addImage(p.out.toDataURL('image/jpeg', p.filter === 'bw' ? 0.85 : 0.95), 'JPEG', 0, 0, W, H, undefined, 'FAST');
-          });
+            doc.addImage(await jpg(p), 'JPEG', 0, 0, W, H, undefined, 'FAST');
+          }
         }
         // CCCD: ghi luôn nội dung mã QR đã đọc được vào thuộc tính PDF (Keywords "CCCD_QR:...", Subject) để
         // phần mềm nhập thông tin CCCD lấy được thông tin chủ dù ảnh trong PDF khó quét QR.
@@ -8326,7 +8464,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if (key === 'card') {
           for (const p of st.pages) {
             for (let t = 0; p.qr === 'busy' && t < 150; t++) await new Promise(r => setTimeout(r, 100));
-            if (p.qr === undefined && p.out) { try { p.qrText = (await decodeQr(p.out)) || ''; p.qr = p.qrText ? (parseCccdQr(p.qrText) || { raw: p.qrText }) : null; } catch (e) { p.qr = null; } }
+            if (p.qr === undefined && p.done) { try { p.qrText = (await decodeQr(await getOut(p))) || ''; p.qr = p.qrText ? (parseCccdQr(p.qrText) || { raw: p.qrText }) : null; } catch (e) { p.qr = null; } }
             if (p.qrText) { qrText = p.qrText; break; }
           }
         }
@@ -8393,9 +8531,16 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       async function uploadCurrent(prog) {
         prog = prog || (() => { });
         prog(0.05, 'Đang tạo file PDF…');
-        const doc = await buildPdf();
-        const b64 = doc.output('datauristring').split(',')[1];
-        const mb = b64.length * 0.75 / 1048576;
+        // Máy chủ nhận tối đa 40MB/file: file lớn hơn thì nén ảnh JPEG mạnh dần (giữ nguyên số điểm ảnh).
+        const LIMIT_MB = 38;
+        let b64 = '', mb = 0;
+        for (const q of [0.95, 0.85, 0.75, 0.6]) {
+          b64 = (await buildPdf(q)).output('datauristring').split(',')[1];
+          mb = b64.length * 0.75 / 1048576;
+          if (mb <= LIMIT_MB) break;
+          prog(0.1, `File ${mb.toFixed(0)} MB vượt giới hạn ${LIMIT_MB} MB — đang nén lại…`);
+        }
+        if (mb > LIMIT_MB) throw new Error(`File PDF quá lớn (${mb.toFixed(0)} MB, tối đa ${LIMIT_MB} MB) — tách bớt trang sang loại “Giấy tờ khác” rồi lưu lại.`);
         prog(0.3, `Đang gửi ${mb.toFixed(1)} MB lên Drive…`, Math.max(3, mb * 2.5));
         const t = curType();
         const d = await api('uploadScan', {
@@ -8421,7 +8566,12 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         }
         await procChain;
         const bad = [];
-        jobs.forEach(([k, pages]) => pages.forEach((p, i) => { if (!p.out) processPage(p); if (isBlurry(p)) bad.push(`${TYPES.find(t => t.v === k.split(':')[1]).short} trang ${i + 1}`); }));
+        const paperOf = k => k === st.curKey ? $('scPaper').value : TYPES.find(t => t.v === k.split(':')[1]).paper;
+        for (const [k, pages] of jobs) for (let i = 0; i < pages.length; i++) {
+          const p = pages[i];
+          if (!p.done) { try { await processAndStore(p, paperOf(k)); } catch (e) { console.warn('[Scan]', e.message); } }
+          if (isBlurry(p)) bad.push(`${TYPES.find(t => t.v === k.split(':')[1]).short} trang ${i + 1}`);
+        }
         if (bad.length && !confirm(`Có ảnh có thể bị nhòe: ${bad.join(', ')}.\nBấm Hủy để chụp lại, hoặc OK để vẫn lưu.`)) return;
         if (!getSession()) setMsg('⏳ Đang đăng nhập bằng tài khoản đã ghi nhớ trên máy…');
         if (!(await ensureSession())) {
@@ -8445,7 +8595,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             const head = `File ${i + 1}/${jobs.length}: <b>${esc(cleanFileName())}.pdf</b> (${pages.length} trang)<br>📁 ${esc(st.folder.name)}<br>`;
             const base = 5 + 95 * i / jobs.length, span = 95 / jobs.length;
             const prog = (f, txt, estSec) => { const tx = head + txt; if (estSec) busyCreep(base + span * f, base + span * 0.98, estSec, tx); else { clearInterval(busy.timer); busyUpdate(base + span * f, tx); } };
-            try { const d = await uploadCurrent(prog); done.push({ d, n: pages.length }); st.sets[key] = []; busyUpdate(base + span, head + '✓ Đã lưu'); }
+            try { const d = await uploadCurrent(prog); done.push({ d, n: pages.length }); pages.forEach(dropPage); st.sets[key] = []; busyUpdate(base + span, head + '✓ Đã lưu'); }
             catch (e) { fail.push({ name: cleanFileName(), msg: e.message, code: e.code }); if (e.code === 'NO_SESSION') break; }
           }
         } catch (e) { fail.push({ name: 'thư mục tờ-thửa', msg: e.message, code: e.code }); }
@@ -8466,12 +8616,13 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
 
       // ── MỞ / ĐÓNG ─────────────────────────────────────────────────────────────────
       // opts: { parcelId, inList, folderUrl (link HSQ), type, kind (moi/doi), sph (số phát hành) }
-      function open(opts) {
+      async function open(opts) {
         opts = opts || {};
+        await restoreP;
         const left = allPageCount(), prevP = st.lastParcel || '', newP = opts.parcelId || '';
         if (left && !confirm(prevP !== newP
           ? `Còn ${left} trang scan chưa lưu của ${prevP ? 'thửa ' + prevP : 'lần trước'} — KHÁC thửa đang mở${newP ? ' (' + newP + ')' : ''}.\nBấm OK để giữ lại (sẽ lưu vào thư mục của thửa đang mở), Hủy để xóa và scan mới.`
-          : `Còn ${left} trang scan chưa lưu từ lần trước. Bấm OK để giữ lại, Hủy để xóa và scan mới.`)) { st.pages = []; st.sets = {}; }
+          : `Còn ${left} trang scan chưa lưu từ lần trước. Bấm OK để giữ lại, Hủy để xóa và scan mới.`)) { allPages().forEach(dropPage); st.pages = []; st.sets = {}; }
         st.lastParcel = newP;
         st.ctx = { inList: !!opts.inList };
         $('scParcel').value = opts.parcelId || '';
@@ -8548,6 +8699,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
 
       fillTypes();
       initEditorEvents();
+      const restoreP = restorePages();
       $('scStage').addEventListener('click', tapFocus);
       $('scFileName').addEventListener('input', () => { st.nameTouched = true; markDuplicate(); });
 
