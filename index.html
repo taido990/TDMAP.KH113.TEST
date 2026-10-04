@@ -2727,7 +2727,7 @@
       <label>Khổ giấy<select id="scPaper" onchange="ScanHS.onPaperChange()">
           <option value="A4">A4 (210×297mm)</option>
           <option value="A3">A3 (297×420mm)</option>
-          <option value="card">Thẻ CCCD (2 mặt/trang A4)</option>
+          <option value="card">Thẻ CCCD (mỗi mặt 1 trang)</option>
         </select></label>
       <label>Tờ-thửa<input id="scParcel" placeholder="vd 9-82" oninput="ScanHS.updateName()" autocomplete="off"></label>
       <label id="scSphWrap" class="full">Số phát hành GCN (bắt buộc khi cấp đổi)<input id="scSph"
@@ -5913,7 +5913,8 @@
           body: JSON.stringify({ action: 'login', username, password, provName, commName, commCode, idToken: '', manualEmail: email })
         });
         const data = await res.json();
-        if (!data || !data.ok || !data.sessionToken) return false;
+        if (!data || !data.ok) return false;
+        if (!data.sessionToken) { ScanHS.setSession(data); return false; } // Apps Script bản cũ -> đánh dấu, không hỏi đăng nhập vô ích
         if (data.maXa) localStorage.setItem(GDRIVE_COMMCODE_STORAGE, data.maXa);
         ScanHS.setSession(data);
         return true;
@@ -6910,13 +6911,19 @@ body.hide-lbl-bg .lbl-style {
               if (!(approx.rows === 4 && cv.isContourConvex(approx))) {
                 // Viền không ra đúng 4 góc (vd GCN A3 mở ra có nếp gấp giữa làm lõm viền, góc bị mòn):
                 // lấy bao lồi của viền rồi nới dần độ đơn giản hoá cho tới khi còn 4 góc.
+                // Chỉ khi viền gần như kín và đặc (diện tích viền >= 90% bao lồi, vd nếp gấp A3); viền dính
+                // lẫn với nét nền (bàn phím, vân bàn...) thì bỏ, tránh cắt ra hình méo to hơn tờ giấy.
                 const hull = new cv.Mat();
                 cv.convexHull(c, hull, false, true);
-                const per = cv.arcLength(hull, true);
-                for (const eps of [0.02, 0.03, 0.045, 0.06, 0.08]) {
-                  approx.delete(); approx = new cv.Mat();
-                  cv.approxPolyDP(hull, approx, eps * per, true);
-                  if (approx.rows <= 4) break;
+                if (area >= cv.contourArea(hull) * 0.9) {
+                  const per = cv.arcLength(hull, true);
+                  for (const eps of [0.02, 0.03, 0.045, 0.06, 0.08]) {
+                    approx.delete(); approx = new cv.Mat();
+                    cv.approxPolyDP(hull, approx, eps * per, true);
+                    if (approx.rows <= 4) break;
+                  }
+                  // Tứ giác tìm được phải sát viền thật (không phình quá 12%).
+                  if (approx.rows === 4 && Math.abs(cv.contourArea(approx)) > area * 1.12) { approx.delete(); approx = new cv.Mat(); }
                 }
                 hull.delete();
               }
@@ -7778,6 +7785,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         st.qrBusy = true; p.qr = 'busy'; renderQr();
         try {
           const text = await decodeQr(p.out);
+          p.qrText = text || '';
           p.qr = text ? (parseCccdQr(text) || { raw: text }) : null;
           console.log('[Scan] QR:', text);
         } catch (e) { console.warn('[Scan] QR lỗi:', e.message); p.qr = null; }
@@ -7902,6 +7910,9 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       // Chưa có phiên (mở bản đồ từ bản lưu trên máy không đăng nhập, hoặc phiên quá 12 giờ): tự đăng nhập
       // ngầm bằng tài khoản + email đã ghi nhớ trên máy (silentScanLogin() ở trang chính) - không bắt nhập lại.
       let silentP = null;
+      // Apps Script đang chạy bản cũ (đăng nhập không trả phiên lưu file) -> đăng nhập lại cũng vô ích.
+      const serverOld = () => { try { return localStorage.getItem('tdmap_scan_server_old') === '1'; } catch (e) { return false; } };
+      const OLD_SERVER_MSG = '⚠ Máy chủ Apps Script đang chạy <b>bản cũ</b>, chưa hỗ trợ lưu file lên Drive — người quản trị cần dán lại <b>AppsScript_DangNhap.gs.txt</b>, chạy hàm <b>taoSheetBanDau</b> rồi Deploy phiên bản mới. Tạm thời bấm <b>⬇️ Tải về</b> để lưu PDF về máy.';
       async function ensureSession() {
         if (getSession()) return true;
         if (typeof window.silentScanLogin !== 'function') return false;
@@ -7973,7 +7984,10 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         }
       }
       async function openFolderPicker() {
-        if (!(await ensureSession())) { setMsg('Cần đăng nhập tài khoản xã trước khi chọn thư mục trên Drive.', 'err'); login(); return; }
+        if (!(await ensureSession())) {
+          if (serverOld()) { setMsg(OLD_SERVER_MSG, 'err'); return; }
+          setMsg('Cần đăng nhập tài khoản xã trước khi chọn thư mục trên Drive.', 'err'); login(); return;
+        }
         $('scFolderOverlay').classList.add('show');
         $('scFMsg').textContent = '';
         $('scNewFolder').value = $('scParcel').value.trim();
@@ -8048,16 +8062,19 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         const key = paperKey(), paper = PAPER[key], s = getSession();
         let doc = null;
         if (key === 'card') {
-          // CCCD: 2 mặt (2 ảnh) đặt đúng kích thước thật trên 1 trang A4 dọc.
-          for (let i = 0; i < st.pages.length; i += 2) {
-            if (!doc) doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-            else doc.addPage('a4', 'portrait');
-            [st.pages[i], st.pages[i + 1]].forEach((p, k) => {
-              if (!p) return;
-              const land = p.out.width >= p.out.height, w = land ? paper.w : paper.h, h = land ? paper.h : paper.w;
-              doc.addImage(p.out.toDataURL('image/jpeg', 0.95), 'JPEG', (210 - w) / 2, 30 + k * (h + 20), w, h, undefined, 'FAST');
-            });
-          }
+          // CCCD: MỖI MẶT 1 TRANG, trang đúng tỉ lệ thẻ và ảnh phủ kín mép trang. Khổ trang rộng 297mm
+          // (như A4 ngang) để phần mềm đọc PDF (vd quét mã QR CCCD) chuyển trang thành ảnh ở độ phân giải
+          // thường vẫn đủ lớn để đọc được QR; ảnh nhúng vẫn giữ nguyên độ phân giải gốc.
+          const CARD_PAGE_LONG = 297;
+          st.pages.forEach(p => {
+            const land = p.out.width >= p.out.height;
+            const r = Math.min(p.out.width, p.out.height) / Math.max(p.out.width, p.out.height);
+            const W = land ? CARD_PAGE_LONG : CARD_PAGE_LONG * r, H = land ? CARD_PAGE_LONG * r : CARD_PAGE_LONG;
+            const orient = land ? 'landscape' : 'portrait';
+            if (!doc) doc = new jsPDF({ unit: 'mm', format: [W, H], orientation: orient, compress: true });
+            else doc.addPage([W, H], orient);
+            doc.addImage(p.out.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, W, H, undefined, 'FAST');
+          });
         } else {
           const fmt = key.toLowerCase();
           st.pages.forEach(p => {
@@ -8068,7 +8085,21 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
             doc.addImage(p.out.toDataURL('image/jpeg', p.filter === 'bw' ? 0.85 : 0.95), 'JPEG', 0, 0, W, H, undefined, 'FAST');
           });
         }
-        doc.setProperties({ title: cleanFileName(), author: s ? s.email : '', creator: 'TDMAP Scan', subject: curType().label });
+        // CCCD: ghi luôn nội dung mã QR đã đọc được vào thuộc tính PDF (Keywords "CCCD_QR:...", Subject) để
+        // phần mềm nhập thông tin CCCD lấy được thông tin chủ dù ảnh trong PDF khó quét QR.
+        let qrText = '';
+        if (key === 'card') {
+          for (const p of st.pages) {
+            for (let t = 0; p.qr === 'busy' && t < 150; t++) await new Promise(r => setTimeout(r, 100));
+            if (p.qr === undefined && p.out) { try { p.qrText = (await decodeQr(p.out)) || ''; p.qr = p.qrText ? (parseCccdQr(p.qrText) || { raw: p.qrText }) : null; } catch (e) { p.qr = null; } }
+            if (p.qrText) { qrText = p.qrText; break; }
+          }
+        }
+        doc.setProperties({
+          title: cleanFileName(), author: s ? s.email : '', creator: 'TDMAP Scan',
+          subject: qrText ? 'CCCD_QR:' + qrText : curType().label,
+          keywords: qrText ? 'CCCD_QR:' + qrText : ''
+        });
         return doc;
       }
       async function downloadPdf() {
@@ -8117,7 +8148,10 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         jobs.forEach(([k, pages]) => pages.forEach((p, i) => { if (!p.out) processPage(p); if (isBlurry(p)) bad.push(`${TYPES.find(t => t.v === k.split(':')[1]).short} trang ${i + 1}`); }));
         if (bad.length && !confirm(`Có ảnh có thể bị nhòe: ${bad.join(', ')}.\nBấm Hủy để chụp lại, hoặc OK để vẫn lưu.`)) return;
         if (!getSession()) setMsg('⏳ Đang đăng nhập bằng tài khoản đã ghi nhớ trên máy…');
-        if (!(await ensureSession())) { setMsg('Cần đăng nhập tài khoản xã để lưu lên thư mục chia sẻ.', 'err'); login(); return; }
+        if (!(await ensureSession())) {
+          if (serverOld()) { setMsg(OLD_SERVER_MSG, 'err'); return; }
+          setMsg('Cần đăng nhập tài khoản xã để lưu lên thư mục chia sẻ.', 'err'); login(); return;
+        }
         if (!st.folder && !st.pendingFolder) { setMsg('Chọn thư mục tờ-thửa để lưu hồ sơ trước.', 'err'); openFolderPicker(); return; }
         st.uploading = true; renderUser();
         const orig = { kind: st.kind, type: $('scType').value, key: st.curKey, name: $('scFileName').value, touched: st.nameTouched, paper: $('scPaper').value };
