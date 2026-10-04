@@ -2730,8 +2730,9 @@
           <option value="card">Thẻ CCCD (2 mặt/trang A4)</option>
         </select></label>
       <label>Tờ-thửa<input id="scParcel" placeholder="vd 9-82" oninput="ScanHS.updateName()" autocomplete="off"></label>
-      <label id="scSphWrap" class="full">Số phát hành GCN (bắt buộc khi cấp đổi)<input id="scSph" placeholder="vd AB 123456"
-          oninput="ScanHS.updateName()" autocomplete="off" autocapitalize="characters"></label>
+      <label id="scSphWrap" class="full">Số phát hành GCN (bắt buộc khi cấp đổi)<input id="scSph"
+          placeholder="vd AB 123456" oninput="ScanHS.updateName()" autocomplete="off"
+          autocapitalize="characters"></label>
       <label class="full">Tên file PDF <span id="scDupNote" style="display:none;color:#ffb74d;">⚠ trùng tên file đã có
           trong thư mục</span><input id="scFileName" autocomplete="off"></label>
       <div class="full sc-folder"><span>📁</span><span id="scFolderName">Chưa chọn thư mục</span><button
@@ -2750,32 +2751,34 @@
         <button class="sc-btn green" onclick="document.getElementById('scCapInput').click()">📷 Chụp bằng camera
           máy</button>
         <button class="sc-btn" onclick="document.getElementById('scPickInput').click()">🖼️ Chọn ảnh có sẵn</button>
-        <button class="sc-btn" id="scWebCamBtn" onclick="ScanHS.setCamMode('web')" style="display:none">🎥 Dùng camera trong trang (có khung viền)</button>
+        <button class="sc-btn" id="scWebCamBtn" onclick="ScanHS.setCamMode('web')" style="display:none">🎥 Dùng camera
+          trong trang (có khung viền)</button>
       </div>
 
       <div id="scReview">
         <div class="sc-rscroll">
-        <div class="sc-grid" id="scGrid"></div>
-        <div class="sc-save">
-          <div class="sc-qr" id="scQr"></div>
-          <div class="sc-row"><span style="font-size:12px;color:#9fb3c3;font-weight:700;">Bộ lọc tất cả trang:</span>
-            <div class="sc-row" id="scAllFilters" style="gap:6px;"></div>
+          <div class="sc-grid" id="scGrid"></div>
+          <div class="sc-save">
+            <div class="sc-qr" id="scQr"></div>
+            <div class="sc-row"><span style="font-size:12px;color:#9fb3c3;font-weight:700;">Bộ lọc tất cả trang:</span>
+              <div class="sc-row" id="scAllFilters" style="gap:6px;"></div>
+            </div>
+            <div class="sc-row" style="justify-content:space-between;">
+              <label style="font-size:12.5px;color:#c9d6e0;display:flex;align-items:center;gap:6px;"><input
+                  type="checkbox" id="scOverwrite" style="margin:0;"> Ghi đè nếu trùng tên</label>
+              <span id="scUser" style="font-size:12px;color:#9fb3c3;"></span>
+            </div>
+            <div class="sc-msg" id="scMsg"></div>
           </div>
-          <div class="sc-row" style="justify-content:space-between;">
-            <label style="font-size:12.5px;color:#c9d6e0;display:flex;align-items:center;gap:6px;"><input
-                type="checkbox" id="scOverwrite" style="margin:0;"> Ghi đè nếu trùng tên</label>
-            <span id="scUser" style="font-size:12px;color:#9fb3c3;"></span>
-          </div>
-          <div class="sc-msg" id="scMsg"></div>
         </div>
+        <div class="sc-actions">
+          <button class="sc-btn" onclick="ScanHS.backToCamera()">＋ Thêm trang</button>
+          <button class="sc-btn" onclick="document.getElementById('scCapInput').click()"
+            title="Mở app camera gốc, chụp xong tự cắt và thêm vào file">📱 Chụp tiếp</button>
+          <button class="sc-btn" onclick="ScanHS.downloadPdf()">⬇️ Tải về</button>
+          <button class="sc-btn green" id="scUploadBtn" style="flex:1;" onclick="ScanHS.uploadPdf()">☁️ Lưu lên thư
+            mục</button>
         </div>
-          <div class="sc-actions">
-            <button class="sc-btn" onclick="ScanHS.backToCamera()">＋ Thêm trang</button>
-            <button class="sc-btn" onclick="document.getElementById('scCapInput').click()" title="Mở app camera gốc, chụp xong tự cắt và thêm vào file">📱 Chụp tiếp</button>
-            <button class="sc-btn" onclick="ScanHS.downloadPdf()">⬇️ Tải về</button>
-            <button class="sc-btn green" id="scUploadBtn" style="flex:1;" onclick="ScanHS.uploadPdf()">☁️ Lưu lên thư
-              mục</button>
-          </div>
       </div>
 
       <div id="scEditor">
@@ -2797,7 +2800,8 @@
           id="scCount">0</b></button>
       <button class="sc-shutter" id="scShutter" onclick="ScanHS.manualCapture()" title="Chụp"></button>
       <button class="sc-iconbtn sc-native" id="scNativeBtn" onclick="document.getElementById('scCapInput').click()"
-        title="Chụp bằng app camera gốc của điện thoại (nét nhất), rồi tự cắt theo viền">📱<small>Camera gốc</small></button>
+        title="Chụp bằng app camera gốc của điện thoại (nét nhất), rồi tự cắt theo viền">📱<small>Camera
+          gốc</small></button>
       <button class="sc-done" id="scDoneBtn" onclick="ScanHS.showReview()" disabled>Xong ›</button>
     </div>
     <input type="file" id="scCapInput" accept="image/*" capture="environment" hidden onchange="ScanHS.onFiles(this)">
@@ -5474,6 +5478,7 @@
     // người dùng (đánh đổi bảo mật nếu máy dùng chung, xem driveLogin()/clearDriveSettings()).
     const GDRIVE_USER_STORAGE = 'tdmap_gdrive_user_v1';
     const GDRIVE_PASS_STORAGE = 'tdmap_gdrive_pass_v1';
+    const GDRIVE_COMMCODE_STORAGE = 'tdmap_gdrive_commcode_v1'; // mã xã của tài khoản đã ghi nhớ (đăng nhập ngầm cho Scan)
     // KHÔNG gắn cứng API Key thật (dạng "AIzaSy...") vào code (file này có thể bị
     // đẩy lên kho GitHub công khai -> lộ key ngay lập tức, bị secret-scanning
     // quét ra). Thay vào đó dùng BÍ DANH NGẮN: người dùng chỉ cần dán mã ngắn
@@ -5857,6 +5862,9 @@
         if (document.getElementById('driveRememberChk').checked) {
           localStorage.setItem(GDRIVE_USER_STORAGE, username);
           localStorage.setItem(GDRIVE_PASS_STORAGE, password);
+          localStorage.setItem('tdmap_prov_v1', provName);
+          localStorage.setItem('tdmap_comm_v1', commName);
+          localStorage.setItem(GDRIVE_COMMCODE_STORAGE, commCode);
         } else {
           localStorage.removeItem(GDRIVE_USER_STORAGE);
           localStorage.removeItem(GDRIVE_PASS_STORAGE);
@@ -5886,6 +5894,30 @@
         setDriveStatus(`Lỗi kết nối API đăng nhập: ${e.message || e}`, true);
         btn.disabled = false;
       }
+    }
+
+    // ĐĂNG NHẬP NGẦM CHO TRÌNH SCAN: dùng Tên đăng nhập/Mật khẩu + email Google đã ghi nhớ trên máy (đã từng
+    // đăng nhập thành công và tick "Ghi nhớ") để lấy phiên lưu file, không bắt mở lại khung đăng nhập.
+    // Email người up file = email đã ghi nhớ (Apps Script ghi kèm "(chưa xác thực)" vì không có ID token mới).
+    async function silentScanLogin() {
+      const username = (localStorage.getItem(GDRIVE_USER_STORAGE) || '').trim();
+      const password = localStorage.getItem(GDRIVE_PASS_STORAGE) || '';
+      const email = (localStorage.getItem(GDRIVE_EMAIL_STORAGE) || '').trim();
+      if (!username || !password || !email || !DRIVE_AUTH_API_URL) return false;
+      const provName = localStorage.getItem('tdmap_prov_v1') || '', commName = localStorage.getItem('tdmap_comm_v1') || '';
+      const commCode = localStorage.getItem(GDRIVE_COMMCODE_STORAGE) || '';
+      try {
+        const res = await fetch(DRIVE_AUTH_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'login', username, password, provName, commName, commCode, idToken: '', manualEmail: email })
+        });
+        const data = await res.json();
+        if (!data || !data.ok || !data.sessionToken) return false;
+        if (data.maXa) localStorage.setItem(GDRIVE_COMMCODE_STORAGE, data.maXa);
+        ScanHS.setSession(data);
+        return true;
+      } catch (e) { return false; }
     }
 
     function driveLogout() {
@@ -6057,6 +6089,7 @@
       localStorage.removeItem(GDRIVE_EMAIL_STORAGE);
       localStorage.removeItem(GDRIVE_USER_STORAGE);
       localStorage.removeItem(GDRIVE_PASS_STORAGE);
+      localStorage.removeItem(GDRIVE_COMMCODE_STORAGE);
       rememberedConfirmedEmail = '';
       driveLoggedIn = false;
       driveLoggedName = '';
@@ -7532,7 +7565,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       function refreshCount() {
         const n = st.pages.length;
         const keys = new Set(Object.keys(st.sets)); if (st.curKey) keys.add(st.curKey);
-        const nf =[...keys].filter(k => (k === st.curKey ? st.pages : st.sets[k]).length).length; // số file sẽ lưu
+        const nf = [...keys].filter(k => (k === st.curKey ? st.pages : st.sets[k]).length).length; // số file sẽ lưu
         $('scUploadBtn').textContent = nf > 1 ? `☁️ Lưu tất cả (${nf} file)` : '☁️ Lưu lên thư mục';
         $('scCount').textContent = n;
         $('scDoneBtn').disabled = !n;
@@ -7866,6 +7899,15 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         }
       }
       function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (e) { } renderUser(); }
+      // Chưa có phiên (mở bản đồ từ bản lưu trên máy không đăng nhập, hoặc phiên quá 12 giờ): tự đăng nhập
+      // ngầm bằng tài khoản + email đã ghi nhớ trên máy (silentScanLogin() ở trang chính) - không bắt nhập lại.
+      let silentP = null;
+      async function ensureSession() {
+        if (getSession()) return true;
+        if (typeof window.silentScanLogin !== 'function') return false;
+        if (!silentP) silentP = Promise.resolve().then(() => window.silentScanLogin()).catch(() => false).finally(() => { setTimeout(() => { silentP = null; }, 0); });
+        return !!(await silentP) && !!getSession();
+      }
       function login() {
         st.loginFromScan = true;
         $('driveModalOverlay').style.zIndex = '10030';
@@ -7880,7 +7922,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           : (old ? '⚠ Apps Script chưa cập nhật bản hỗ trợ lưu file scan' : '<a href="#" onclick="event.preventDefault();ScanHS.login()">🔐 Đăng nhập để lưu lên Drive</a>');
         $('scUploadBtn').disabled = st.uploading;
       }
-      async function api(action, body) {
+      async function api(action, body, retried) {
+        if (!getSession()) await ensureSession();
         const s = getSession();
         if (!s) { const e = new Error('Chưa đăng nhập (hoặc phiên đã hết hạn) — bấm “Đăng nhập để lưu lên Drive”.'); e.code = 'NO_SESSION'; throw e; }
         const res = await fetch(DRIVE_AUTH_API_URL, {
@@ -7892,7 +7935,11 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         try { data = await res.json(); } catch (e) { throw new Error('Máy chủ trả về dữ liệu không hợp lệ (HTTP ' + res.status + ').'); }
         if (!data || !data.ok) {
           const msg = (data && data.message) || 'Lỗi không rõ';
-          if (/^SESSION_EXPIRED/.test(msg)) { clearSession(); const e = new Error(msg.replace(/^SESSION_EXPIRED:\s*/, '')); e.code = 'NO_SESSION'; throw e; }
+          if (/^SESSION_EXPIRED/.test(msg)) {
+            clearSession();
+            if (!retried && await ensureSession()) return api(action, body, true);
+            const e = new Error(msg.replace(/^SESSION_EXPIRED:\s*/, '')); e.code = 'NO_SESSION'; throw e;
+          }
           if (/không được hỗ trợ/i.test(msg)) throw new Error('Apps Script chưa cập nhật bản hỗ trợ scan/lưu file — dán lại code AppsScript_DangNhap.gs.txt rồi Deploy phiên bản mới.');
           throw new Error(msg);
         }
@@ -7925,8 +7972,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           if (st.folder === f) setMsg('⚠ Thư mục HSQ đặt sẵn: ' + esc(e.message), 'err');
         }
       }
-      function openFolderPicker() {
-        if (!getSession()) { setMsg('Cần đăng nhập tài khoản xã trước khi chọn thư mục trên Drive.', 'err'); login(); return; }
+      async function openFolderPicker() {
+        if (!(await ensureSession())) { setMsg('Cần đăng nhập tài khoản xã trước khi chọn thư mục trên Drive.', 'err'); login(); return; }
         $('scFolderOverlay').classList.add('show');
         $('scFMsg').textContent = '';
         $('scNewFolder').value = $('scParcel').value.trim();
@@ -8069,7 +8116,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         const bad = [];
         jobs.forEach(([k, pages]) => pages.forEach((p, i) => { if (!p.out) processPage(p); if (isBlurry(p)) bad.push(`${TYPES.find(t => t.v === k.split(':')[1]).short} trang ${i + 1}`); }));
         if (bad.length && !confirm(`Có ảnh có thể bị nhòe: ${bad.join(', ')}.\nBấm Hủy để chụp lại, hoặc OK để vẫn lưu.`)) return;
-        if (!getSession()) { setMsg('Cần đăng nhập tài khoản xã để lưu lên thư mục chia sẻ.', 'err'); login(); return; }
+        if (!getSession()) setMsg('⏳ Đang đăng nhập bằng tài khoản đã ghi nhớ trên máy…');
+        if (!(await ensureSession())) { setMsg('Cần đăng nhập tài khoản xã để lưu lên thư mục chia sẻ.', 'err'); login(); return; }
         if (!st.folder && !st.pendingFolder) { setMsg('Chọn thư mục tờ-thửa để lưu hồ sơ trước.', 'err'); openFolderPicker(); return; }
         st.uploading = true; renderUser();
         const orig = { kind: st.kind, type: $('scType').value, key: st.curKey, name: $('scFileName').value, touched: st.nameTouched, paper: $('scPaper').value };
@@ -8145,7 +8193,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         setMode(st.pages.length ? 'review' : 'camera');
         if (st.mode === 'review') showReview();
         loadOpenCV();
-        verifyFolder();
+        if (getSession()) verifyFolder();
+        else ensureSession(); // đăng nhập ngầm xong, setSession() tự hiện người up file + kiểm tra thư mục
       }
       function close(fromHistory) {
         if (!st.open) return;
