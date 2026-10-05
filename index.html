@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TDMAP.PRO.VN-KH113</title>
-  <!-- 041026v3 -->
+  <!-- 051026v1 -->
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index_KH113.html (và manifest.json) trên server  -->
@@ -3530,16 +3530,16 @@
     // ── HƯỚNG DẪN ĐẶT TÊN FILE KHI SCAN HSQ ───────────────────────────────────────
     // Hướng dẫn khi mở HSQ của TỪNG THỬA (nút "Hồ sơ HSQ" trong popup thửa) — mẫu đơn giản.
     function buildHsqGuideHtmlThua(parcelId) {
-      const exampleDon = parcelId ? `${parcelId}-don.pdf` : '81-370-don.pdf';
-      const exampleGt = parcelId ? `${parcelId}-gt.pdf` : '81-370-gt.pdf';
+      const exampleDon = parcelId ? `${parcelId}-DDK.pdf` : '81-370-DDK.pdf';
+      const exampleGt = parcelId ? `${parcelId}-GTK.pdf` : '81-370-GTK.pdf';
       return `
     <div class="hsq-guide-cols">
       <div class="hsq-guide-col col-chua">
         <div class="hsq-guide-col-title">⬜ Chưa có giấy</div>
         <div class="hsq-guide-item" data-scan="c1" title="Bấm để scan mục này"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1.pdf</code></div></div>
         <div class="hsq-guide-item" data-scan="c2" title="Bấm để scan mục này"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2.pdf</code></div></div>
-        <div class="hsq-guide-item" data-scan="don" title="Bấm để scan mục này"><b>3.</b><div>Scan Đơn đăng ký → lưu: <code>Tờ-thửa-don.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleDon}</span></div></div>
-        <div class="hsq-guide-item" data-scan="gt" title="Bấm để scan mục này"><b>4.</b><div>Giấy tờ khác (nếu có) → lưu: <code>Tờ-thửa-gt.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleGt}</span></div></div>
+        <div class="hsq-guide-item" data-scan="don" title="Bấm để scan mục này"><b>3.</b><div>Scan Đơn đăng ký → lưu: <code>Tờ-thửa-DDK.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleDon}</span></div></div>
+        <div class="hsq-guide-item" data-scan="gt" title="Bấm để scan mục này"><b>4.</b><div>Giấy tờ khác (nếu có) → lưu: <code>Tờ-thửa-GTK.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleGt}</span></div></div>
         <div class="hsq-guide-item" data-scan="pnd" title="Bấm để scan mục này"><b>5.</b><div>Phiếu nhận đất → lưu: <code>pnd.pdf</code></div></div>
       </div>
       <div class="hsq-guide-col col-da">
@@ -3547,7 +3547,7 @@
         <div class="hsq-guide-item" data-scan="c1" title="Bấm để scan mục này"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1.pdf</code></div></div>
         <div class="hsq-guide-item" data-scan="c2" title="Bấm để scan mục này"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2.pdf</code></div></div>
         <div class="hsq-guide-item" data-scan="gcn4" title="Bấm để scan mục này"><b>3.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code><span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
-        <div class="hsq-guide-item" data-scan="gt" title="Bấm để scan mục này"><b>4.</b><div>Giấy tờ khác (nếu có) → lưu: <code>Tờ-thửa-gt.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleGt}</span></div></div>
+        <div class="hsq-guide-item" data-scan="gt" title="Bấm để scan mục này"><b>4.</b><div>Giấy tờ khác (nếu có) → lưu: <code>Tờ-thửa-GTK.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleGt}</span></div></div>
         <div class="hsq-guide-item" data-scan="pnd" title="Bấm để scan mục này"><b>5.</b><div>Phiếu nhận đất → lưu: <code>pnd.pdf</code></div></div>
       </div>
     </div>
@@ -3562,8 +3562,8 @@
         <div class="hsq-guide-col-title">⬜ Chưa có giấy</div>
         <div class="hsq-guide-item" data-scan="c1" title="Bấm để scan mục này"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1-Tờ-thửa.pdf</code><span class="hsq-guide-example">Ví dụ: c1-10-150.pdf</span></div></div>
         <div class="hsq-guide-item" data-scan="c2" title="Bấm để scan mục này"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2-Tờ-thửa.pdf</code><span class="hsq-guide-example">Ví dụ: c2-10-150.pdf</span></div></div>
-        <div class="hsq-guide-item" data-scan="don" title="Bấm để scan mục này"><b>3.</b><div>Scan Đơn đăng ký → lưu: <code>Tờ-thửa-don.pdf</code><span class="hsq-guide-example">Ví dụ: 10-150-don.pdf</span></div></div>
-        <div class="hsq-guide-item" data-scan="gt" title="Bấm để scan mục này"><b>4.</b><div>Giấy tờ khác (nếu có)<span class="hsq-guide-example">Ví dụ: 10-150-gt.pdf</span></div></div>
+        <div class="hsq-guide-item" data-scan="don" title="Bấm để scan mục này"><b>3.</b><div>Scan Đơn đăng ký → lưu: <code>Tờ-thửa-DDK.pdf</code><span class="hsq-guide-example">Ví dụ: 10-150-DDK.pdf</span></div></div>
+        <div class="hsq-guide-item" data-scan="gt" title="Bấm để scan mục này"><b>4.</b><div>Giấy tờ khác (nếu có)<span class="hsq-guide-example">Ví dụ: 10-150-GTK.pdf</span></div></div>
       </div>
       <div class="hsq-guide-col col-da">
         <div class="hsq-guide-col-title">✅ Đã có giấy</div>
@@ -7111,24 +7111,26 @@ body.hide-lbl-bg .lbl-style {
         card: { w: 85.6, h: 54, px: [1011, 638], label: 'Thẻ CCCD' }
       };
       // Loại hồ sơ -> khổ giấy, bộ lọc mặc định (Gốc = giữ màu ảnh chụp) và mẫu tên file (theo "Hướng dẫn đặt tên file").
-      //   moi (cấp mới): Tờ-thửa-<hậu tố>      vd 9-82-don, 9-82-c1
+      //   moi (cấp mới): Tờ-thửa-<hậu tố>      vd 9-82-DDK, 9-82-c1
       //   doi (cấp đổi): SốPhátHành-<HẬU TỐ>   vd AB123456-GCN, AB123456-C1 (bắt buộc nhập số phát hành)
+      //   doiTT: true = cấp đổi nhưng đặt tên theo Tờ-thửa (vd 9-82-GT, 9-82-PND), không cần số phát hành.
       //   moi: null = loại không có ở hồ sơ cấp mới (chưa có GCN) -> ẩn ô tích.
       const TYPES = [
         { v: 'c1', label: 'CCCD chủ 1', short: 'CCCD 1', paper: 'card', filter: 'orig', moi: 'c1', doi: 'C1' },
         { v: 'c2', label: 'CCCD chủ 2', short: 'CCCD 2', paper: 'card', filter: 'orig', moi: 'c2', doi: 'C2' },
-        { v: 'don', label: 'Đơn đăng ký', short: 'Đơn', paper: 'A4', filter: 'orig', moi: 'don', doi: 'GT' },
-        { v: 'gt', label: 'Giấy tờ khác', short: 'Giấy tờ khác', paper: 'A4', filter: 'orig', moi: 'gt', doi: 'GTK' },
+        { v: 'don', label: 'Đơn đăng ký', short: 'Đơn', paper: 'A4', filter: 'orig', moi: 'DDK', doi: 'GT', doiTT: true },
+        { v: 'gt', label: 'Giấy tờ khác', short: 'Giấy tờ khác', paper: 'A4', filter: 'orig', moi: 'GTK', doi: 'GTK', doiTT: true },
         { v: 'gcn4', label: 'Giấy chứng nhận (A4)', short: 'GCN A4', paper: 'A4', filter: 'orig', moi: null, doi: 'GCN' },
         { v: 'gcn3', label: 'Giấy chứng nhận (A3)', short: 'GCN A3', paper: 'A3', filter: 'orig', moi: null, doi: 'GCN' },
-        { v: 'pnd', label: 'Phiếu nhận đất', short: 'Phiếu nhận đất', paper: 'A4', filter: 'orig', moi: 'pnd', doi: 'PND' },
-        { v: 'khac', label: 'Khác (tự đặt tên)', short: 'Khác', paper: 'A4', filter: 'orig', moi: 'scan', doi: 'SCAN' }
+        { v: 'pnd', label: 'Phiếu nhận đất', short: 'Phiếu nhận đất', paper: 'A4', filter: 'orig', moi: 'pnd', doi: 'PND', doiTT: true },
+        { v: 'khac', label: 'Khác (tự đặt tên)', short: 'Khác', paper: 'A4', filter: 'orig', moi: 'scan', doi: 'SCAN', doiTT: true }
       ];
       const KINDS = { moi: 'Cấp mới', doi: 'Cấp đổi' };
       // Số phát hành: viết hoa, giữ 1 khoảng trắng giữa chữ và số (ab123456 / AB  123456 -> AB 123456).
       const normSph = s => (s || '').toUpperCase().replace(/\s+/g, ' ').trim().replace(/^([A-Z]{1,3})\s*(\d+)$/, '$1 $2');
+      const needSph = (t, kind) => kind === 'doi' && !t.doiTT;
       function typeFileName(t, c) {
-        return c.kind === 'doi' ? `${c.sph || 'SốPH'}-${t.doi}` : `${c.id || 'Tờ-thửa'}-${t.moi}`;
+        return needSph(t, c.kind) ? `${c.sph || 'SốPH'}-${t.doi}` : `${c.id || 'Tờ-thửa'}-${t[c.kind]}`;
       }
       const FILTERS = [['color', '🎨 Màu'], ['gray', '◐ Xám'], ['bw', '◑ Đen trắng'], ['orig', '🖼 Gốc']];
 
@@ -8408,7 +8410,7 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
       }
       // Cấp đổi bắt buộc có số phát hành; trả về false (và báo lỗi) nếu còn thiếu.
       function checkSph() {
-        if (st.kind !== 'doi' || normSph($('scSph').value)) return true;
+        if (!needSph(curType(), st.kind) || normSph($('scSph').value)) return true;
         $('scSettings').classList.remove('collapsed');
         setMsg('Hồ sơ cấp đổi: nhập <b>Số phát hành GCN</b> để đặt tên file trước khi lưu.', 'err');
         $('scSph').focus();
@@ -8419,9 +8421,9 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
         if (!curType()[st.kind]) { $('scType').value = 'don'; onTypeChange(); return; }
         const t = curType(), id = $('scParcel').value.trim(), sph = normSph($('scSph').value);
         $('scSphWrap').style.display = st.kind === 'doi' ? '' : 'none';
-        $('scSph').classList.toggle('need', st.kind === 'doi' && !sph);
+        $('scSph').classList.toggle('need', needSph(t, st.kind) && !sph);
         if (!st.nameTouched) $('scFileName').value = typeFileName(t, { kind: st.kind, id, sph });
-        const who = st.kind === 'doi' ? sph : id;
+        const who = needSph(t, st.kind) ? sph : id;
         $('scTitle').textContent = '📷 ' + KINDS[st.kind] + ' · ' + t.label + (who ? ' · ' + who : '');
         renderTypeChecks();
         markDuplicate();
