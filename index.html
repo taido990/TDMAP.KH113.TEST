@@ -3,9 +3,11 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- viewport-fit=cover: cần cho env(safe-area-inset-*) khi mở dạng app (iPhone tai thỏ, status bar trong suốt) -->
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>TDMAP.PRO.VN-KH113</title>
-  <!-- 051026v2 -->
+  <!-- 101026v1 -->
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index_KH113.html (và manifest.json) trên server  -->
@@ -20,6 +22,11 @@
   <meta name="apple-mobile-web-app-title" content="TDMAP">
   <meta name="application-name" content="TDMAP">
   <link rel="manifest" href="manifest.json">
+
+  <!-- Leaflet CSS nạp trong <head>, TRƯỚC <style> của trang: tránh nháy giao diện lúc tải
+       và để các rule ghi đè .leaflet-* bên dưới luôn thắng. -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 
   <style>
     * {
@@ -1195,16 +1202,15 @@
 
     #splash .brand {
       position: absolute;
-      /* top mặc định (trước khi adjustTopLayout() tính lại chính xác theo chiều
-         cao thật của cụm nút HSQ + thanh tìm kiếm) - đặt đủ thấp để không đè lên
-         zoomBadge/HSQ (trái) và logoWrap (phải) ngay cả trên điện thoại hẹp. */
-      top: 130px;
+      /* Canh giữa màn hình: không trùng hàng với các cụm nút ở phần trên. */
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      font-size: 26px;
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
+      font-size: clamp(16px, 5.5vw, 26px);
+      letter-spacing: clamp(2px, 1vw, 4px);
       font-weight: 800;
       color: #00c6a7;
-      letter-spacing: 4px;
       background: #ffffff;
       padding: 10px 24px;
       border-radius: 12px;
@@ -2734,6 +2740,593 @@
       color: #c0392b;
       margin-top: 6px;
     }
+
+    /* ══ BẢNG THỐNG KÊ (logo góc phải): tab Loại đất / Nhóm đất ══ */
+    .ms-head {
+      font-size: 12px;
+      font-weight: 800;
+      color: #00c6a7;
+      letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+
+    .ms-tabs {
+      display: flex;
+      gap: 4px;
+      background: #f1f4f6;
+      border-radius: 9px;
+      padding: 3px;
+      margin-bottom: 10px;
+    }
+
+    .ms-tab {
+      flex: 1;
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #667;
+      cursor: pointer;
+    }
+
+    .ms-tab.on {
+      background: #fff;
+      color: #00a88e;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+    }
+
+    .ms-grp {
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+      min-width: 240px;
+    }
+
+    .ms-grp-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+    }
+
+    .ms-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .ms-grp-name {
+      font-weight: 800;
+      color: #333;
+      flex: 1;
+    }
+
+    .ms-grp-name small {
+      font-weight: 700;
+      color: #999;
+      font-size: 10.5px;
+    }
+
+    .ms-grp-share {
+      font-weight: 700;
+      color: #1a6fd4;
+      white-space: nowrap;
+    }
+
+    .ms-bar {
+      height: 7px;
+      border-radius: 4px;
+      background: #eceff1;
+      overflow: hidden;
+      margin: 6px 0 4px;
+    }
+
+    .ms-bar i {
+      display: block;
+      height: 100%;
+      border-radius: 4px;
+    }
+
+    .ms-grp-sub {
+      font-size: 11.5px;
+      color: #666;
+    }
+
+    .ms-grp-sub b {
+      color: #ff1493;
+    }
+
+    .ms-grp-sub span {
+      color: #999;
+    }
+
+    .ms-note {
+      font-size: 10.5px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    /* Tab Trạng thái: công tắc tô màu + chú giải */
+    .ms-switch {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      background: #f6f9fb;
+      border-radius: 9px;
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #333;
+      cursor: pointer;
+      min-width: 240px;
+    }
+
+    .ms-switch input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ms-switch-ui {
+      position: relative;
+      width: 34px;
+      height: 20px;
+      border-radius: 10px;
+      background: #c5ccd3;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+
+    .ms-switch-ui::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+      transition: transform .2s;
+    }
+
+    .ms-switch input:checked+.ms-switch-ui {
+      background: #00c6a7;
+    }
+
+    .ms-switch input:checked+.ms-switch-ui::after {
+      transform: translateX(14px);
+    }
+
+    .ms-st {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid #f2f2f2;
+      font-size: 12px;
+    }
+
+    .ms-st.zero {
+      opacity: .45;
+    }
+
+    .ms-sw {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0, 0, 0, .15);
+    }
+
+    .ms-st-name {
+      flex: 1;
+      color: #333;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .ms-st-name small {
+      display: inline-block;
+      min-width: 16px;
+      text-align: center;
+      background: #eef1f4;
+      color: #666;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 800;
+    }
+
+    .ms-st-n {
+      font-weight: 800;
+      color: #1a6fd4;
+      white-space: nowrap;
+    }
+
+    .ms-st-n span {
+      font-size: 10px;
+      font-weight: 400;
+      color: #888;
+    }
+
+    .ms-total {
+      padding-top: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #444;
+      text-align: right;
+    }
+
+    .ms-total b {
+      color: #ff1493;
+    }
+
+    .ms-total span {
+      color: #999;
+      font-weight: 400;
+    }
+
+    /* ══ TỐI ƯU ĐIỆN THOẠI ══════════════════════════════════════════════════════
+       Gom các ghi đè cho màn hình nhỏ/cảm ứng vào một chỗ (đặt cuối để thắng rule
+       cùng độ đặc hiệu ở trên). Biến --sa-*: vùng an toàn tai thỏ/thanh Home
+       (chỉ khác 0 khi có viewport-fit=cover, xem thẻ meta viewport). */
+    :root {
+      --sa-top: env(safe-area-inset-top, 0px);
+      --sa-bottom: env(safe-area-inset-bottom, 0px);
+      --sa-left: env(safe-area-inset-left, 0px);
+      --sa-right: env(safe-area-inset-right, 0px);
+    }
+
+    /* Thanh địa chỉ di động co giãn: dvh = chiều cao thật đang nhìn thấy */
+    @supports (height: 100dvh) {
+
+      html,
+      body {
+        height: 100dvh;
+      }
+
+      .modal-box {
+        max-height: 86dvh;
+      }
+
+      #directionsPanel {
+        max-height: 70dvh;
+      }
+    }
+
+    button,
+    a,
+    label,
+    .sg-item,
+    .drive-file-item,
+    .sc-fitem {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    /* Cột trái (badge zoom + HSQ): bề rộng do adjustTopLayout() giới hạn tới mép
+       khung logo; chữ dài tự rút gọn "…" thay vì chui xuống dưới logo. */
+    #topControlsRow {
+      top: calc(15px + var(--sa-top));
+      left: calc(15px + var(--sa-left));
+    }
+
+    #zoomBadge,
+    #hsqXaBtn {
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #zoomBadge {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+    }
+
+    #zoomBadge .zb-dot,
+    #hsqXaBtn .ico {
+      flex-shrink: 0;
+    }
+
+    #zoomBadgeText,
+    #hsqXaBtn .txt {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #hsqXaBtn {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+    }
+
+    /* Thứ tự lớp: control Leaflet (1000) < control nhãn (1001) < thanh tìm kiếm +
+       gợi ý + menu Mở file (1003) < khung logo + bảng thống kê (1004, inline);
+       bảng thửa/chỉ đường (1010+) phủ lên các nút bản đồ phía dưới. */
+    #searchBar,
+    #searchSuggestions {
+      z-index: 1003;
+    }
+
+    #popup {
+      z-index: 1010;
+    }
+
+    #directionsPanel {
+      z-index: 1011;
+    }
+
+    /* Đang gõ tìm kiếm thì danh sách gợi ý luôn nổi trên bảng thửa (màn thấp/xoay ngang) */
+    #searchSuggestions {
+      z-index: 1012;
+    }
+
+    #searchBar,
+    #searchSuggestions {
+      left: calc(15px + var(--sa-left));
+      max-width: calc(100vw - 30px - var(--sa-left) - var(--sa-right));
+    }
+
+    #searchSuggestions {
+      max-height: min(320px, 45vh);
+      overscroll-behavior: contain;
+    }
+
+    #searchInput {
+      min-width: 0;
+      padding: 6px 0;
+    }
+
+    #labelZoomControl {
+      left: calc(12px + var(--sa-left));
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+    }
+
+    .leaflet-top.leaflet-right {
+      margin-right: var(--sa-right);
+    }
+
+    .leaflet-bottom.leaflet-right {
+      margin-bottom: var(--sa-bottom);
+      margin-right: var(--sa-right);
+    }
+
+    .leaflet-control-zoom.leaflet-bar {
+      border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    /* Thông báo: tự xuống dòng, không tràn màn hình; nằm trên popup thửa */
+    #statusPill,
+    #fileProgressLabel {
+      left: 0;
+      right: 0;
+      margin: 0 auto;
+      width: fit-content;
+      max-width: calc(100vw - 32px);
+      transform: none;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.35;
+    }
+
+    #statusPill {
+      bottom: calc(20px + var(--sa-bottom));
+      z-index: 1500;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+    }
+
+    /* Nhãn tiến trình mở file: nằm giữa, ngay dưới thanh tìm kiếm (top do
+       adjustTopLayout() đặt), lọt giữa control nhãn bên trái và cụm 🧭/📍 bên
+       phải - thay vì ở mép trên đè lên badge zoom + logo. */
+    #fileProgressLabel {
+      top: 160px;
+      z-index: 998;
+      max-width: calc(100vw - 130px - var(--sa-left) - var(--sa-right));
+    }
+
+    #fileProgressWrap {
+      top: var(--sa-top);
+    }
+
+    /* Bảng thông tin thửa + chỉ đường: chừa thanh Home iPhone, cuộn được khi màn thấp */
+    #popup,
+    #directionsPanel {
+      padding-bottom: calc(18px + var(--sa-bottom));
+      padding-left: calc(14px + var(--sa-left));
+      padding-right: calc(14px + var(--sa-right));
+      overscroll-behavior: contain;
+    }
+
+    #popup {
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+
+    #popupHandle,
+    #dirHandle {
+      width: 40px;
+      height: 4px;
+    }
+
+    #popupClose,
+    #dirClose {
+      width: 32px;
+      height: 32px;
+      font-size: 14px;
+    }
+
+    #popupTitle {
+      line-height: 1.3;
+    }
+
+    .btn-row a {
+      padding: 11px 6px;
+      font-size: 13px;
+      border-radius: 10px;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, .15);
+    }
+
+    .modal-overlay,
+    #customAlertOverlay {
+      padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left);
+    }
+
+    .modal-box {
+      border-radius: 14px;
+    }
+
+    /* ── Thiết bị cảm ứng: vùng chạm tối thiểu ~36–44px ── */
+    @media (pointer: coarse) {
+
+      /* Cỡ vừa phải: đủ bấm bằng ngón tay nhưng không chiếm nhiều chỗ trên bản đồ */
+      #locateBtn,
+      #navModeBtn {
+        width: 34px;
+        height: 34px;
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+
+      .leaflet-touch .leaflet-bar a {
+        width: 32px;
+        height: 32px;
+        line-height: 32px;
+        font-size: 18px;
+      }
+
+      #lzcBtnCol {
+        gap: 3px;
+      }
+
+      .lzc-btn {
+        width: 26px;
+        height: 22px;
+        font-size: 11px;
+        border-radius: 6px;
+      }
+
+      #labelZoomControl {
+        padding: 5px 4px;
+        border-radius: 12px;
+      }
+
+      #searchBtn {
+        min-width: 32px;
+        min-height: 32px;
+      }
+
+      #moreToolsBtn {
+        min-height: 32px;
+        padding: 0 4px;
+      }
+
+      #moreToolsGroup button {
+        padding-top: 11px;
+        padding-bottom: 11px;
+      }
+
+      #searchSuggestions .sg-item {
+        padding: 11px 14px;
+      }
+
+      #logoWrap label {
+        padding: 3px 0;
+      }
+
+      #logoWrap input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+      }
+
+      .modal-btn {
+        padding: 11px 16px;
+      }
+
+      .modal-btn.ghost {
+        padding: 11px 8px;
+      }
+
+      #customAlertBtn {
+        padding: 11px 28px;
+      }
+
+      .drive-input {
+        padding: 10px;
+      }
+
+      .dirModeBtn {
+        padding: 11px 6px;
+      }
+    }
+
+    /* ── Màn hình rất hẹp (≤ 360px) ── */
+    @media (max-width: 360px) {
+      #moreToolsBtn {
+        font-size: 12px;
+      }
+
+      #searchInput {
+        font-size: 13px;
+      }
+
+      .btn-row {
+        gap: 6px;
+      }
+
+      .btn-row a {
+        font-size: 12px;
+        gap: 4px;
+      }
+
+      #popupTitle,
+      #popupInfo .popup-owner-line {
+        font-size: 15.5px;
+      }
+    }
+
+    /* ── Máy tính bảng / PC: bảng thửa là thẻ nổi góc dưới-trái, không trải hết bề ngang ── */
+    @media (min-width: 768px) and (min-height: 481px) {
+      #popup {
+        left: 15px;
+        right: auto;
+        bottom: 15px;
+        width: 400px;
+        border-radius: 16px;
+      }
+    }
+
+    /* ── Điện thoại xoay ngang (màn thấp) ── */
+    @media (max-height: 480px) and (orientation: landscape) {
+
+      /* Bảng thửa thành panel nổi góc dưới-phải thay vì trải hết bề ngang
+         (chiều cao màn ngang chỉ ~360-420px, bottom sheet che gần hết bản đồ). */
+      #popup {
+        left: auto;
+        right: calc(8px + var(--sa-right));
+        bottom: calc(8px + var(--sa-bottom));
+        width: min(380px, 48vw);
+        max-height: calc(100vh - 100px);
+        padding: 6px 12px 12px;
+        border-radius: 16px;
+        border-top-width: 2.5px;
+      }
+
+      #popupHandle {
+        margin-bottom: 6px;
+      }
+
+      #directionsPanel {
+        max-height: 85vh;
+      }
+    }
   </style>
 </head>
 
@@ -2746,7 +3339,7 @@
   <div id="map"></div>
 
   <div id="logoWrap" style="
-  position:fixed; top:10px; right:10px; z-index:1002;
+  position:fixed; top:calc(10px + env(safe-area-inset-top, 0px)); right:calc(10px + env(safe-area-inset-right, 0px)); z-index:1004;
   background:#ffffff;
   border:1px solid rgba(0,0,0,0.08); border-radius:10px;
   padding:6px 12px; box-shadow:0 2px 10px rgba(0,0,0,0.15);
@@ -2776,7 +3369,7 @@
     </div>
 
     <div id="mapStatsDetail"
-      style="display:none; position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid rgba(0,0,0,0.1); border-radius:8px; padding:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:max-content; min-width:220px; max-height:400px; overflow-y:auto; cursor:default;">
+      style="display:none; position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid rgba(0,0,0,0.1); border-radius:8px; padding:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:max-content; min-width:220px; max-width:calc(100vw - 20px); max-height:min(400px, 60vh); overflow-y:auto; cursor:default;">
     </div>
   </div>
 
@@ -2789,9 +3382,9 @@
     <button id="searchBtn" onclick="executeSearch()" title="Tìm kiếm thửa đất">🔍</button>
     <div id="moreToolsGroup">
       <button id="loadBtn" onclick="closeMoreTools();document.getElementById('fileInput').click()">📂 Mở file</button>
-      <button id="driveBtn" onclick="closeMoreTools();openDriveModal()" title="Mở file .geojson từ Google Drive"><svg
-          width="15" height="15" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
-          style="vertical-align:middle;">
+      <button id="driveBtn" onclick="closeMoreTools();openDriveModal()"
+        title="Mở file .geojson / .gml từ Google Drive"><svg width="15" height="15" viewBox="0 0 100 100"
+          xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;">
           <polygon points="50,6 6,88 50,60" fill="#2684FC" />
           <polygon points="50,6 50,60 94,88" fill="#00AC47" />
           <polygon points="6,88 94,88 50,60" fill="#FFBA00" />
@@ -2804,7 +3397,7 @@
   </div>
   <div id="searchSuggestions"></div>
   <input type="file" id="fileInput"
-    accept=".kml,.geojson,application/vnd.google-earth.kml+xml,application/geo+json,application/json"
+    accept=".kml,.geojson,.gml,application/vnd.google-earth.kml+xml,application/geo+json,application/json,application/gml+xml"
     onchange="handleFile(this.files[0])">
 
   <div id="fileProgressWrap">
@@ -2818,7 +3411,7 @@
     <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
 
     <button id="hsqXaBtn" title="Link HSQ chung của Xã (ngoài danh sách thửa trong file)" onclick="openHsqXaLink()">
-      <span class="ico">🗂️</span> HSQ Ngoài Danh Sách
+      <span class="ico">🗂️</span><span class="txt">HSQ Ngoài Danh Sách</span>
     </button>
   </div>
 
@@ -3020,7 +3613,8 @@
           Ghi nhớ thư mục cho lần mở sau
         </label>
 
-        <button id="driveListBtn" disabled onclick="listDriveGeojsonFiles()">🔍 Tải danh sách file .geojson</button>
+        <button id="driveListBtn" disabled onclick="listDriveGeojsonFiles()">🔍 Tải danh sách file .geojson /
+          .gml</button>
         <div id="driveStatusMsg" style="display:none;"></div>
         <div id="driveFileList"></div>
       </div>
@@ -3238,7 +3832,6 @@
     </div>
   </div>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- TỐI ƯU: dvhc2025.js (danh mục 63 tỉnh + hàng nghìn xã) chỉ cần cho tính năng
@@ -3807,8 +4400,18 @@
       const searchBar = document.getElementById('searchBar');
       const suggestions = document.getElementById('searchSuggestions');
       if (!row || !searchBar) return;
+      // Cột nút trái (badge zoom + HSQ) không được lấn sang khung logo góc phải:
+      // giới hạn bề rộng tới mép trái của logo, chữ dài tự rút gọn "…".
+      const logoWrap = document.getElementById('logoWrap');
+      const logoRect = logoWrap ? logoWrap.getBoundingClientRect() : null;
+      if (logoRect && logoRect.width) {
+        const rowLeft = row.getBoundingClientRect().left;
+        row.style.maxWidth = Math.max(140, Math.round(logoRect.left - rowLeft - 8)) + 'px';
+      }
       const rowRect = row.getBoundingClientRect();
-      const newTop = Math.round(rowRect.bottom + 10);
+      // Thanh tìm kiếm nằm dưới cả cột trái lẫn khung logo (logo cao thêm khi hiện thống kê).
+      const topBlockBottom = Math.max(rowRect.bottom, logoRect ? logoRect.bottom : 0);
+      const newTop = Math.round(topBlockBottom + 10);
       searchBar.style.top = newTop + 'px';
       if (suggestions) {
         const barRect = searchBar.getBoundingClientRect();
@@ -3825,24 +4428,11 @@
       const belowSearchTop = Math.round(searchBarRect.bottom + 10);
       const labelZoomControl = document.getElementById('labelZoomControl');
       if (labelZoomControl) labelZoomControl.style.top = belowSearchTop + 'px';
-      // Tiêu đề "TDMAP.PRO.VN" trên màn hình splash: đặt NGAY DƯỚI thanh tìm kiếm
-      // (cùng mốc belowSearchTop) thay vì 1 giá trị top cố định - tránh chồng đè
-      // lên zoomBadge/nút HSQ (trái) và logoWrap (phải) trên điện thoại màn hình
-      // hẹp, nơi cụm nút trái có thể xuống dòng làm thanh tìm kiếm bị đẩy xuống.
-      const splashEl = document.getElementById('splash');
-      const splashBrand = document.querySelector('#splash .brand');
-      if (splashBrand) {
-        splashBrand.style.top = belowSearchTop + 'px';
-        // Khung "Tải file bản đồ lên" (splash-card) canh giữa màn hình theo chiều
-        // dọc (justify-content) độc lập với tiêu đề (vì tiêu đề position:absolute
-        // nằm ngoài luồng flex) -> trên điện thoại thấp, khung này có thể trồi lên
-        // đúng chỗ tiêu đề đang đứng. Đặt padding-top = đáy tiêu đề + khoảng cách,
-        // đẩy toàn bộ nội dung xuống dưới tiêu đề, không cần canh giữa nữa.
-        if (splashEl) {
-          const brandRect = splashBrand.getBoundingClientRect();
-          splashEl.style.paddingTop = Math.round(brandRect.bottom + 24) + 'px';
-        }
-      }
+      const progressLabel = document.getElementById('fileProgressLabel');
+      if (progressLabel) progressLabel.style.top = belowSearchTop + 'px';
+      // Tiêu đề "TDMAP.PRO.VN" của splash nay canh giữa màn hình bằng CSS (đặt
+      // ngay dưới thanh tìm kiếm như trước thì trùng hàng với control nhãn 16-19
+      // bên trái và cụm 🧭/📍 bên phải -> đè lên nhau lúc đang tải).
       // Lúc gọi lần đầu (ngay khi script chạy), bản đồ Leaflet + các control 🧭/📍/+/-
       // CHƯA được tạo (map khởi tạo ở đoạn code phía dưới) -> phần tử ".leaflet-top.
       // leaflet-right" chưa tồn tại trong DOM -> querySelector trả về null, bỏ qua an
@@ -3853,6 +4443,19 @@
     window.addEventListener('load', adjustTopLayout);
     window.addEventListener('resize', adjustTopLayout);
     window.addEventListener('orientationchange', () => setTimeout(adjustTopLayout, 150));
+    // Tự căn lại khi khối trên đổi kích thước mà không có resize cửa sổ (hiện ô
+    // thống kê ĐĐK trong logo, đổi chữ badge zoom, nút HSQ rút gọn...).
+    if ('ResizeObserver' in window) {
+      let adjRaf = 0;
+      const ro = new ResizeObserver(() => {
+        cancelAnimationFrame(adjRaf);
+        adjRaf = requestAnimationFrame(adjustTopLayout);
+      });
+      ['topControlsRow', 'logoWrap', 'searchBar'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) ro.observe(el);
+      });
+    }
     // Chạy ngay + lần nữa sau khi layout ổn định (webfont/icon có thể đổi kích thước nút)
     adjustTopLayout();
     setTimeout(adjustTopLayout, 300);
@@ -3939,9 +4542,42 @@
     // toàn bộ script đã chạy xong (mọi let/const đã khởi tạo đủ), tránh lỗi trên mà
     // vẫn cảm giác "tức thì" với người dùng.
     setTimeout(() => {
+      if (startLocalTestMode()) return;
       locateMe();
       openDriveModal();
     }, 0);
+
+    // ── CHẾ ĐỘ TEST CỤC BỘ (chỉ khi chạy trên localhost, vd qua serve_test.py) ─────
+    //   ?test                         -> bỏ qua khung đăng nhập + định vị, mở app trống
+    //   ?test=GML_GCADAS_VBD/ThuaDat.gml -> như trên + tự nạp file bản đồ (cùng thư mục web)
+    // Trên hosting thật (không phải localhost) tham số này bị bỏ qua.
+    function startLocalTestMode() {
+      const params = new URLSearchParams(location.search);
+      if (!params.has('test')) return false;
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return false;
+      const path = (params.get('test') || '').trim();
+      document.title = '[TEST] ' + document.title;
+      if (!path) { showStatus('Chế độ TEST: bỏ qua đăng nhập — bấm "Mở file" để chọn bản đồ trên máy.'); return true; }
+      // Chỉ cho đường dẫn tương đối trong thư mục web (không URL ngoài, không "..")
+      if (/^[a-z]+:|^\/\/|(^|[\\/])\.\.([\\/]|$)/i.test(path)) {
+        showAlert(`Chế độ TEST: đường dẫn "${path}" không hợp lệ (chỉ dùng đường dẫn tương đối trong thư mục web).`);
+        return true;
+      }
+      (async () => {
+        FileProgress.start(`TEST: đang tải ${path}...`);
+        try {
+          const res = await fetch(path, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          FileProgress.set(10);
+          await processMapText(text, path.split(/[\\/]/).pop(), 10);
+        } catch (err) {
+          FileProgress.fail('Lỗi tải file test');
+          showAlert(`Chế độ TEST: không tải được "${path}".\n\nChi tiết lỗi: ${err && err.message || err}`);
+        }
+      })();
+      return true;
+    }
 
     // ── TẠM DỪNG TỰ-PAN KHI NGƯỜI DÙNG ĐANG CHẠM BẢN ĐỒ ─────────────────────────────
     // Khi chế độ 🧭 "Định vị khi di chuyển" đang bật, mỗi lần có toạ độ GPS mới bản
@@ -4620,13 +5256,44 @@
     // - Checkbox "Tên chủ" ĐANG TẮT                                     -> VÀNG cho mọi thửa chưa DDK
     // - Checkbox "Tên chủ" ĐANG BẬT + có Tên chủ (chưa đăng ký)         -> XANH NGỌC
     // - Checkbox "Tên chủ" ĐANG BẬT + chưa có Tên chủ (chưa đăng ký)    -> VÀNG
+    // ── CHẾ ĐỘ TÔ MÀU THEO TRẠNG THÁI ĐĂNG KÝ (tab "Trạng thái" trong bảng thống kê) ──
+    // Mã 1-5 theo TRANG_THAI_DK_TEXT (dữ liệu GML gCadas). File không có mã (KML/
+    // GeoJSON): 'DDK' -> "Đã đăng ký (không rõ mã)", còn lại coi như mã 1.
+    const STATUS_COLOR_STORAGE_KEY = 'tdmap_status_color_mode';
+    const STATUS_COLORS = {
+      '1': { color: '#ffeb3b', text: 'Chưa đăng ký' },
+      '2': { color: '#ff9800', text: 'Đã ĐK, chưa đủ điều kiện cấp GCN' },
+      '3': { color: '#f44336', text: 'Đã ĐK, không đủ điều kiện cấp GCN' },
+      '4': { color: '#2196f3', text: 'Đã ĐK, đủ điều kiện cấp GCN' },
+      '5': { color: '#00c853', text: 'Đã cấp GCN' },
+      'DDK': { color: '#ff1493', text: 'Đã đăng ký (không rõ mã)' }
+    };
+    const STATUS_FILL_OPACITY = 0.35;
+    let STATUS_COLOR_MODE = (() => {
+      try { return localStorage.getItem(STATUS_COLOR_STORAGE_KEY) === '1'; } catch (e) { return false; }
+    })();
+    function getStatusKey(p) {
+      const ma = p && p.trangThaiMa != null ? String(p.trangThaiMa).trim() : '';
+      if (STATUS_COLORS[ma] && ma !== 'DDK') return ma;
+      return p && p.trangThaiDK === 'DDK' ? 'DDK' : '1';
+    }
+    function setStatusColorMode(on) {
+      STATUS_COLOR_MODE = !!on;
+      try { localStorage.setItem(STATUS_COLOR_STORAGE_KEY, STATUS_COLOR_MODE ? '1' : '0'); } catch (e) { /* bỏ qua */ }
+      refreshParcelColorsOnMap();
+      updateMapStats(); // vẽ lại công tắc trong tab
+      showStatus(STATUS_COLOR_MODE ? 'Đang tô màu thửa theo trạng thái đăng ký' : 'Đã tắt tô màu theo trạng thái đăng ký');
+    }
+
     function getParcelColor(p) {
+      if (STATUS_COLOR_MODE) return STATUS_COLORS[getStatusKey(p)].color;
       if (p && p.trangThaiDK === 'DDK') return '#ff1493';
       if (SHOW_OWNER_COLOR && p && p.tenChu && p.tenChu.trim()) return '#00e5ff';
       return '#ffff00';
     }
     // Bản mờ (dùng khi lọc tìm kiếm, thửa không khớp) - giữ cùng tông màu, chỉ giảm alpha.
     function getParcelDimColor(p) {
+      if (STATUS_COLOR_MODE) return STATUS_COLORS[getStatusKey(p)].color + '33';
       if (p && p.trangThaiDK === 'DDK') return '#ff149333';
       if (SHOW_OWNER_COLOR && p && p.tenChu && p.tenChu.trim()) return '#00e5ff33';
       return '#ffff0033';
@@ -4656,9 +5323,10 @@
     // Style nền chuẩn (khi không lọc/không chọn): fillColor + fillOpacity của thửa.
     function getParcelFillStyle(p) {
       const lt = getLandTypeFillColor(p);
+      // Đường/sông/thủy lợi giữ màu nền loại đất; thửa khác tô đậm theo trạng thái nếu bật chế độ.
       return lt
         ? { fillColor: lt, fillOpacity: LANDTYPE_FILL_OPACITY }
-        : { fillColor: getParcelColor(p), fillOpacity: PARCEL_FILL_OPACITY_DEFAULT };
+        : { fillColor: getParcelColor(p), fillOpacity: STATUS_COLOR_MODE ? STATUS_FILL_OPACITY : PARCEL_FILL_OPACITY_DEFAULT };
     }
     // Style đầy đủ (viền + nền) ở trạng thái bình thường.
     function getParcelNormalStyle(p) {
@@ -4767,7 +5435,15 @@
           .map(k => ({ type: k, total: loaiDatStats[k].total, ddk: loaiDatStats[k].ddk }))
           .sort((a, b) => b.total - a.total);
 
-        let html = `<div style="font-size:12px; font-weight:800; color:#00c6a7; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:6px; letter-spacing:0.5px;">THỐNG KÊ LOẠI ĐẤT</div>`;
+        let html = `<div class="ms-head">THỐNG KÊ THỬA ĐẤT</div>
+          <div class="ms-tabs" onclick="event.stopPropagation()">
+            <button type="button" class="ms-tab${mapStatsTab === 'loai' ? ' on' : ''}" data-tab="loai" onclick="setMapStatsTab('loai')">Loại đất</button>
+            <button type="button" class="ms-tab${mapStatsTab === 'nhom' ? ' on' : ''}" data-tab="nhom" onclick="setMapStatsTab('nhom')">Nhóm đất</button>
+            <button type="button" class="ms-tab${mapStatsTab === 'tt' ? ' on' : ''}" data-tab="tt" onclick="setMapStatsTab('tt')">Trạng thái</button>
+          </div>`;
+        html += `<div class="ms-pane" data-pane="tt"${mapStatsTab === 'tt' ? '' : ' hidden'}>${buildStatusStatsHtml(total)}</div>`;
+        html += `<div class="ms-pane" data-pane="nhom"${mapStatsTab === 'nhom' ? '' : ' hidden'}>${buildLandGroupStatsHtml(sortedStats, total, ddkCount)}</div>`;
+        html += `<div class="ms-pane" data-pane="loai"${mapStatsTab === 'loai' ? '' : ' hidden'}>`;
         html += `<table style="width:100%; border-collapse:collapse; font-size:12px;">`;
         html += `<tr style="color:#666; border-bottom:1px solid #f2f2f2;">
                <th style="text-align:left; padding:4px 0;">Loại đất</th>
@@ -4778,14 +5454,139 @@
           let totalPct = total > 0 ? ((s.total / total) * 100).toFixed(1) : 0;
           let ddkPct = s.total > 0 ? Math.round((s.ddk / s.total) * 100) : 0;
           html += `<tr>
-                <td style="font-weight:700; color:#444; padding:5px 0;">${s.type}</td>
+                <td style="font-weight:700; color:#444; padding:5px 0;">${escapeHtml(s.type)}</td>
                 <td style="text-align:right; color:#1a6fd4; font-weight:700; padding:5px 0;">${s.total} <span style="font-size:10px; color:#888; font-weight:400;">(${totalPct}%)</span></td>
                 <td style="text-align:right; color:#ff1493; font-weight:700; padding:5px 0 5px 12px;">${s.ddk} <span style="font-size:10px; color:#888; font-weight:400;">(${ddkPct}%)</span></td>
                </tr>`;
         }
-        html += `</table>`;
+        html += `</table></div>`;
         detailEl.innerHTML = html;
       }
+    }
+
+    // ── THỐNG KÊ THEO NHÓM ĐẤT (NNP / PNN / CSD) ───────────────────────────────────
+    // Theo danh mục mã loại đất TT 08/2024/TT-BTNMT, kèm mã cũ thường gặp trong dữ
+    // liệu trước 2024 (TT 25/2014) đã rõ thuộc nhóm nào (BHK, NHK, LUN, DDT...).
+    // Mã không có trong bảng -> dòng "Chưa xác định nhóm" (liệt kê mã để kiểm tra).
+    // Theo yêu cầu nghiệp vụ: đất ở (OTC/ONT/ODT, kể cả thửa nhiều mục đích có
+    // đất ở như ONT+CLN, ODT+...) GỘP CHUNG với đất nông nghiệp thành 1 nhóm;
+    // nhóm phi nông nghiệp còn lại không gồm đất ở.
+    const RESIDENTIAL_CODES = ['OTC', 'ONT', 'ODT'];
+    const LAND_GROUPS = [
+      {
+        key: 'NNO', label: 'NNP + OTC', name: 'Đất nông nghiệp và đất ở', color: '#43a047',
+        codes: ['NNP', 'CHN', 'LUA', 'LUC', 'LUK', 'HNK', 'CLN', 'LNP', 'RDD', 'RPH', 'RSX', 'RSN',
+          'NTS', 'CNT', 'LMU', 'NKH', /* mã cũ */ 'BHK', 'NHK', 'LUN', /* đất ở */ ...RESIDENTIAL_CODES]
+      },
+      {
+        key: 'PNN', label: 'trừ đất ở', name: 'Đất phi nông nghiệp', color: '#e8430a',
+        codes: ['PNN', 'TSC', 'CQA', 'CQP', 'CAN', 'DSN', 'DVH', 'DXH', 'DYT', 'DGD',
+          'DTT', 'DKH', 'DMT', 'DKT', 'DNG', 'DSK', 'CSK', 'SCC', 'SKK', 'SKN', 'SCT', 'TMD', 'SKC', 'SKS',
+          'CCC', 'DGT', 'DTL', 'DCT', 'DPC', 'DDD', 'DRA', 'DNL', 'DBV', 'DCH', 'DKV', 'TON', 'TIN', 'NTD',
+          'TVC', 'MNC', 'SON', 'PNK', /* mã cũ */ 'DDT', 'DDL', 'DSH', 'DCK', 'SKX', 'SKT']
+      },
+      {
+        key: 'CSD', label: 'CSD', name: 'Đất chưa sử dụng', color: '#8d6e63',
+        codes: ['CSD', 'CGT', 'BCS', 'DCS', 'NCS', 'MCS']
+      }
+    ];
+    const LAND_GROUP_BY_CODE = {};
+    LAND_GROUPS.forEach(g => g.codes.forEach(c => { LAND_GROUP_BY_CODE[c] = g.key; }));
+
+    // Thửa nhiều mục đích (vd "ONT+CLN") xếp theo mã ĐẦU TIÊN (mục đích chính).
+    function splitLandCodes(ld) {
+      return String(ld || '').toUpperCase().split(/[+,;/\s]+/).filter(Boolean);
+    }
+
+    let mapStatsTab = 'loai';
+    function setMapStatsTab(tab) {
+      mapStatsTab = tab;
+      const box = document.getElementById('mapStatsDetail');
+      if (!box) return;
+      box.querySelectorAll('.ms-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+      box.querySelectorAll('.ms-pane').forEach(p => { p.hidden = p.dataset.pane !== tab; });
+    }
+
+    // sortedStats: [{type, total, ddk}] theo từng chuỗi loại đất (đã gom ở updateMapStats)
+    function buildLandGroupStatsHtml(sortedStats, total, ddkTotal) {
+      const g = {};
+      LAND_GROUPS.forEach(x => { g[x.key] = { total: 0, ddk: 0, mixed: 0, res: 0, resDdk: 0 }; });
+      const unk = { total: 0, ddk: 0, codes: [] };
+      for (const s of sortedStats) {
+        const codes = splitLandCodes(s.type);
+        // Có đất ở ở bất kỳ vị trí nào (ONT, ONT+CLN, CLN+ONT...) -> nhóm NN + đất ở
+        const isRes = codes.some(c => RESIDENTIAL_CODES.includes(c));
+        const key = isRes ? 'NNO' : (codes.length ? LAND_GROUP_BY_CODE[codes[0]] : null);
+        if (!key) {
+          unk.total += s.total; unk.ddk += s.ddk; unk.codes.push(s.type);
+          continue;
+        }
+        g[key].total += s.total; g[key].ddk += s.ddk;
+        if (isRes) { g[key].res += s.total; g[key].resDdk += s.ddk; }
+        else if (codes.length > 1) g[key].mixed += s.total;
+      }
+      const pct = (a, b) => b > 0 ? Math.round(a / b * 100) : 0;
+      const row = (name, color, s, note) => {
+        const p = pct(s.ddk, s.total);
+        return `<div class="ms-grp">
+            <div class="ms-grp-top">
+              <span class="ms-dot" style="background:${color}"></span>
+              <span class="ms-grp-name">${name}</span>
+              <span class="ms-grp-share">${s.total} thửa · ${total > 0 ? (s.total / total * 100).toFixed(1) : 0}%</span>
+            </div>
+            <div class="ms-bar"><i style="width:${p}%;background:${color}"></i></div>
+            <div class="ms-grp-sub">Đã đăng ký: <b>${s.ddk}</b>/${s.total} <span>(${p}%)</span>
+              · Chưa ĐK: ${s.total - s.ddk}</div>
+            ${note ? `<div class="ms-note">${note}</div>` : ''}
+          </div>`;
+      };
+      let html = '';
+      LAND_GROUPS.forEach(x => {
+        const s = g[x.key];
+        const notes = [];
+        if (x.key === 'NNO' && s.total) {
+          notes.push(`Trong đó: nông nghiệp ${s.total - s.res} thửa (ĐK ${s.ddk - s.resDdk}); ` +
+            `đất ở ONT/ODT kể cả ONT+… ${s.res} thửa (ĐK ${s.resDdk})`);
+        }
+        if (s.mixed) notes.push(`Trong đó ${s.mixed} thửa nhiều mục đích (xếp theo mã đầu)`);
+        html += row(`${x.name} <small>(${x.label})</small>`, x.color, s, notes.join('<br>'));
+      });
+      if (unk.total) {
+        const list = unk.codes.slice(0, 8).map(escapeHtml).join(', ') + (unk.codes.length > 8 ? '…' : '');
+        html += row('Chưa xác định nhóm', '#9e9e9e', unk, `Mã: ${list}`);
+      }
+      html += `<div class="ms-total">Tổng: <b>${ddkTotal}</b>/${total} thửa đã đăng ký
+        <span>(${pct(ddkTotal, total)}%)</span></div>`;
+      return html;
+    }
+
+    // Tab "Trạng thái": số thửa theo mã trạng thái đăng ký 1-5 (+ "Đã ĐK không rõ mã"),
+    // kiêm chú giải màu; công tắc bật/tắt tô màu bản đồ theo trạng thái.
+    function buildStatusStatsHtml(total) {
+      const cnt = {};
+      for (const p of allParcels) {
+        const k = getStatusKey(p);
+        cnt[k] = (cnt[k] || 0) + 1;
+      }
+      let html = `<label class="ms-switch" onclick="event.stopPropagation()">
+          <input type="checkbox" ${STATUS_COLOR_MODE ? 'checked' : ''} onchange="setStatusColorMode(this.checked)">
+          <span class="ms-switch-ui"></span>
+          <span>Tô màu bản đồ theo trạng thái</span>
+        </label>`;
+      for (const k of ['1', '2', '3', '4', '5', 'DDK']) {
+        const n = cnt[k] || 0;
+        if (!n && k === 'DDK') continue; // chỉ hiện khi file không có mã trạng thái
+        const pctTxt = total > 0 ? (n / total * 100).toFixed(1) : 0;
+        html += `<div class="ms-st${n ? '' : ' zero'}">
+            <span class="ms-sw" style="background:${STATUS_COLORS[k].color}"></span>
+            <span class="ms-st-name">${k !== 'DDK' ? `<small>${k}</small> ` : ''}${STATUS_COLORS[k].text}</span>
+            <span class="ms-st-n">${n}<span> (${pctTxt}%)</span></span>
+          </div>`;
+      }
+      const dk = total - (cnt['1'] || 0);
+      html += `<div class="ms-total">Đã đăng ký: <b>${dk}</b>/${total}
+        <span>(${total > 0 ? Math.round(dk / total * 100) : 0}%)</span></div>`;
+      return html;
     }
 
     function toggleMapStatsDetail() {
@@ -4918,9 +5719,13 @@
       const el = document.getElementById('zoomBadge');
       const txt = document.getElementById('zoomBadgeText');
       const below = z < LABEL_MIN_ZOOM;
+      // Chữ ngắn để badge không lấn sang khung logo góc phải trên điện thoại; câu đầy đủ ở tooltip.
       txt.textContent = below
-        ? `Zoom ${z} · cần ≥${LABEL_MIN_ZOOM} để hiện nhãn/điểm`
-        : `Zoom ${z} · đang hiện nhãn/điểm`;
+        ? `Zoom ${z} · nhãn từ ${LABEL_MIN_ZOOM}`
+        : `Zoom ${z} · đang hiện nhãn`;
+      el.title = below
+        ? `Cần phóng to tới mức ≥${LABEL_MIN_ZOOM} để hiện nhãn/điểm thửa`
+        : 'Đang hiện nhãn/điểm thửa';
       el.classList.toggle('below-threshold', below);
     }
     // Chỉ đăng ký DUY NHẤT MỘT listener cho toàn bộ map (zoomend + moveend),
@@ -5030,7 +5835,9 @@
       const isDdk = p.trangThaiDK === 'DDK';
       const hasOwner = !!(p.tenChu && p.tenChu.trim());
       const statusClass = isDdk ? 'ddk' : (hasOwner ? 'owner' : 'cdk');
-      const statusText = isDdk ? 'Đã đăng ký (DDK)' : (hasOwner ? 'Chưa đăng ký (đã có tên chủ)' : 'Chưa đăng ký (CDK)');
+      const statusText = TRANG_THAI_DK_TEXT[p.trangThaiMa]
+        ? `${TRANG_THAI_DK_TEXT[p.trangThaiMa]} (mã ${p.trangThaiMa})`
+        : (isDdk ? 'Đã đăng ký (DDK)' : (hasOwner ? 'Chưa đăng ký (đã có tên chủ)' : 'Chưa đăng ký (CDK)'));
       const statusLineHtml = `<div class="popup-status-line popup-status-${statusClass}">Trạng thái: ${statusText}</div>`;
 
       document.getElementById('popupInfo').innerHTML = `${loaiDatLineHtml}${ownerLineHtml}${statusLineHtml}`;
@@ -5052,24 +5859,38 @@
 
       document.getElementById('popup').classList.add('open');
 
-      if (p._poly && p.rings.length > 0) {
-        const center = p._poly.getBounds().getCenter();
-        const curZoom = map.getZoom();
+      const target = (p._poly && p.rings.length > 0) ? p._poly.getBounds().getCenter()
+        : (p.lat ? L.latLng(p.lat, p.lon) : null);
+      if (target) {
         const MIN_VIEW_ZOOM = 17; // đảm bảo nhìn rõ thửa khi click
-        if (curZoom < MIN_VIEW_ZOOM) {
-          map.flyTo(center, MIN_VIEW_ZOOM, { animate: true, duration: 0.6 });
-        } else {
-          map.panTo(center, { animate: true, duration: 0.6 }); // giữ nguyên zoom hiện tại, không tự thu nhỏ
-        }
-      } else if (p.lat) {
         const curZoom = map.getZoom();
-        const MIN_VIEW_ZOOM = 17;
-        if (curZoom < MIN_VIEW_ZOOM) {
-          map.flyTo([p.lat, p.lon], MIN_VIEW_ZOOM, { animate: true, duration: 0.6 });
-        } else {
-          map.panTo([p.lat, p.lon], { animate: true, duration: 0.6 }); // giữ nguyên zoom hiện tại
-        }
+        const z = curZoom < MIN_VIEW_ZOOM ? MIN_VIEW_ZOOM : curZoom; // không tự thu nhỏ
+        const dest = centerInVisibleArea(target, z);
+        if (curZoom < MIN_VIEW_ZOOM) map.flyTo(dest, z, { animate: true, duration: 0.6 });
+        else map.panTo(dest, { animate: true, duration: 0.6 });
       }
+    }
+
+    // Tâm bản đồ cần đặt để latlng hiện ở GIỮA vùng còn nhìn thấy - giữa đáy thanh
+    // tìm kiếm và mép trên bảng thông tin thửa (trên điện thoại bảng này che gần nửa
+    // dưới màn hình, canh vào giữa màn hình như cũ thì thửa bị che mất).
+    function centerInVisibleArea(latlng, zoom) {
+      const size = map.getSize();
+      const mapH = size.y;
+      const popupEl = document.getElementById('popup');
+      // Màn xoay ngang: bảng thửa là panel bên phải (xem CSS) -> dời sang trái thay vì lên trên
+      if (popupEl && popupEl.offsetWidth && popupEl.offsetWidth < size.x * 0.7) {
+        const r = popupEl.getBoundingClientRect();
+        const onLeft = r.left + r.width / 2 < size.x / 2; // màn rộng: panel bên trái
+        const dx = (onLeft ? -1 : 1) * popupEl.offsetWidth / 2;
+        return map.unproject(map.project(latlng, zoom).add([dx, 0]), zoom);
+      }
+      const popupH = popupEl ? Math.min(popupEl.offsetHeight, mapH * 0.75) : 0;
+      const bar = document.getElementById('searchBar');
+      const topH = bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+      const dy = (popupH - topH) / 2;
+      if (dy <= 0 || topH + popupH >= mapH - 60) return latlng; // màn quá thấp: giữ cách cũ
+      return map.unproject(map.project(latlng, zoom).add([0, dy]), zoom);
     }
 
     function closePopup() {
@@ -5638,24 +6459,348 @@
       });
     }
 
-    // ── NHẬN DIỆN ĐỊNH DẠNG FILE (KML hay GeoJSON) ─────────────────────────────────
-    function detectIsGeoJSON(filename, text) {
-      const lower = (filename || '').toLowerCase();
-      if (lower.endsWith('.geojson') || lower.endsWith('.json')) return true;
-      if (lower.endsWith('.kml') || lower.endsWith('.xml')) return false;
-      // Không xác định được qua đuôi file -> dò nội dung: JSON luôn bắt đầu bằng '{'
-      const t = (text || '').trim();
-      return t.startsWith('{');
+    // ── ĐỌC FILE GML (gCadas / ViLIS / VietBando xuất "ThuaDat.gml", QGIS xuất GML) ──
+    // Toạ độ trong GML địa chính thường là VN-2000 phẳng (mét) -> phải chuyển sang
+    // WGS-84 cho Leaflet. Kinh tuyến trục (KTT) lấy từ srsName (vd
+    // "VN2000_LDong_3_107.75" = múi 3°, KTT 107.75°); không đọc được thì báo lỗi
+    // NEED_LON0 để luồng chính hỏi người dùng rồi đọc lại.
+    // Toàn bộ code nằm TRONG createGmlParser (không dùng biến ngoài) để Web Worker
+    // dựng lại được từ createGmlParser.toString() — không phải chép tay mã nguồn
+    // như parser KML/GeoJSON.
+    function createGmlParser() {
+      // --- VN-2000 phẳng -> WGS-84: TM Krüger bậc 6 + Helmert 7 tham số EPSG:6960
+      // (Coordinate Frame). Cùng thuật toán với .claude/skills/vn2000-crs/scripts/vn2000.js
+      // (đã đối chiếu PROJ, sai lệch < 5 mm).
+      const A = 6378137.0, F = 1 / 298.257223563, E2 = F * (2 - F), E = Math.sqrt(E2);
+      const D2R = Math.PI / 180, SEC = Math.PI / (180 * 3600);
+      const n = F / (2 - F), n2 = n * n, n3 = n2 * n, n4 = n3 * n, n5 = n4 * n, n6 = n5 * n;
+      const AA = A / (1 + n) * (1 + n2 / 4 + n4 / 64 + n6 / 256);
+      const BETA = [
+        n / 2 - 2 * n2 / 3 + 37 * n3 / 96 - n4 / 360 - 81 * n5 / 512 + 96199 * n6 / 604800,
+        n2 / 48 + n3 / 15 - 437 * n4 / 1440 + 46 * n5 / 105 - 1118711 * n6 / 3870720,
+        17 * n3 / 480 - 37 * n4 / 840 - 209 * n5 / 4480 + 5569 * n6 / 90720,
+        4397 * n4 / 161280 - 11 * n5 / 504 - 830251 * n6 / 7257600,
+        4583 * n5 / 161280 - 108847 * n6 / 3991680,
+        20648693 * n6 / 638668800];
+      const TX = -191.90441429, TY = -39.30318279, TZ = -111.45032835;
+      const RX = -0.00928836 * SEC, RY = 0.01975479 * SEC, RZ = -0.00427372 * SEC;
+      const S = 1 + 0.252906278e-6;
+
+      function tmInverse(east, north, lon0, k0) {
+        const xi = north / (k0 * AA), eta = (east - 500000) / (k0 * AA);
+        let xp = xi, ep = eta;
+        for (let j = 1; j <= 6; j++) {
+          xp -= BETA[j - 1] * Math.sin(2 * j * xi) * Math.cosh(2 * j * eta);
+          ep -= BETA[j - 1] * Math.cos(2 * j * xi) * Math.sinh(2 * j * eta);
+        }
+        const taup = Math.sin(xp) / Math.sqrt(Math.sinh(ep) * Math.sinh(ep) + Math.cos(xp) * Math.cos(xp));
+        const lam = Math.atan2(Math.sinh(ep), Math.cos(xp));
+        let tau = taup;
+        for (let j = 0; j < 10; j++) {
+          const sg = Math.sinh(E * Math.atanh(E * tau / Math.sqrt(1 + tau * tau)));
+          const ti = tau * Math.sqrt(1 + sg * sg) - sg * Math.sqrt(1 + tau * tau);
+          const d = (taup - ti) / Math.sqrt(1 + ti * ti) * (1 + (1 - E2) * tau * tau) / ((1 - E2) * Math.sqrt(1 + tau * tau));
+          tau += d;
+          if (Math.abs(d) < 1e-14) break;
+        }
+        return [Math.atan(tau) / D2R, lon0 + lam / D2R];
+      }
+      // Trả về [lat, lon] WGS-84 (đúng thứ tự Leaflet cần)
+      function vn2000ToLatLng(north, east, lon0, k0) {
+        const g = tmInverse(east, north, lon0, k0);
+        const p = g[0] * D2R, l = g[1] * D2R, sp = Math.sin(p), cp = Math.cos(p);
+        const N = A / Math.sqrt(1 - E2 * sp * sp);
+        const x = N * cp * Math.cos(l), y = N * cp * Math.sin(l), z = N * (1 - E2) * sp;
+        const X = TX + S * (x + RZ * y - RY * z);
+        const Y = TY + S * (-RZ * x + y + RX * z);
+        const Z = TZ + S * (RY * x - RX * y + z);
+        const lon = Math.atan2(Y, X), pp = Math.hypot(X, Y);
+        let lat = Math.atan2(Z, pp * (1 - E2));
+        for (let i = 0; i < 10; i++) {
+          const sl = Math.sin(lat), Nn = A / Math.sqrt(1 - E2 * sl * sl);
+          const h = pp / Math.cos(lat) - Nn;
+          const nw = Math.atan2(Z, pp * (1 - E2 * Nn / (Nn + h)));
+          if (Math.abs(nw - lat) < 1e-14) { lat = nw; break; }
+          lat = nw;
+        }
+        return [lat / D2R, lon / D2R];
+      }
+
+      // --- Hệ toạ độ từ srsName ---
+      // Trả về { kind: 'wgs84' } | { kind: 'vn2000', lon0, k0 } | null (chưa rõ KTT).
+      function crsFromSrsName(srs) {
+        const s = String(srs || '');
+        if (/(?:EPSG:{1,2}|EPSG\/0\/)(4326|4756)\b|CRS84|WGS[\s_-]*84(?![\s\S]*VN)/i.test(s) && !/VN[\s_-]*2000/i.test(s)) return { kind: 'wgs84' };
+        if (/(?:EPSG:{1,2}|EPSG\/0\/)3405\b/i.test(s)) return { kind: 'vn2000', lon0: 105, k0: 0.9996 };
+        if (/(?:EPSG:{1,2}|EPSG\/0\/)3406\b/i.test(s)) return { kind: 'vn2000', lon0: 111, k0: 0.9996 };
+        if (!/VN[\s_-]*2000/i.test(s)) return null;
+        // "..._3_107.75", "..._6_105", "... 107 45" (độ phút), "107°45'"
+        let m = s.match(/(1\d{2})[°\s_-]+([0-5]?\d)['′]?\s*$/);
+        let lon0 = m ? Number(m[1]) + Number(m[2]) / 60 : NaN;
+        if (isNaN(lon0)) {
+          m = s.match(/(1\d{2}(?:[.,]\d+)?)\D*$/);
+          if (m) lon0 = Number(m[1].replace(',', '.'));
+        }
+        if (!(lon0 >= 100 && lon0 <= 115)) return null;
+        const k0 = /[_\s-]6[_\s-]/.test(s) || /UTM/i.test(s) ? 0.9996 : 0.9999;
+        return { kind: 'vn2000', lon0, k0 };
+      }
+
+      const decodeXml = (v) => String(v)
+        .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+        .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+        .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'").replace(/&amp;/g, '&').trim();
+
+      // Đọc dãy số của 1 vòng ranh: GML2 <coordinates>x,y x,y</coordinates>,
+      // GML3 <posList>x y x y</posList> hoặc nhiều <pos>x y</pos>.
+      function ringNumbers(ringXml) {
+        let m = ringXml.match(/<(?:\w+:)?coordinates\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?coordinates>/);
+        if (m) {
+          const cs = (m[1].match(/\bcs="([^"]*)"/) || [, ','])[1];
+          const ts = (m[1].match(/\bts="([^"]*)"/) || [, ' '])[1];
+          const out = [];
+          m[2].trim().split(ts === ' ' ? /\s+/ : ts).forEach(t => {
+            const parts = t.trim().split(cs);
+            if (parts.length >= 2) out.push([Number(parts[0]), Number(parts[1])]);
+          });
+          return out;
+        }
+        m = ringXml.match(/<(?:\w+:)?posList\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?posList>/);
+        if (m) {
+          const dim = Number((m[1].match(/\bsrsDimension="(\d)"/) || [, 2])[1]) || 2;
+          const nums = m[2].trim().split(/\s+/).map(Number);
+          const out = [];
+          for (let i = 0; i + 1 < nums.length; i += dim) out.push([nums[i], nums[i + 1]]);
+          return out;
+        }
+        const out = [];
+        const reP = /<(?:\w+:)?pos\b[^>]*>([\s\S]*?)<\/(?:\w+:)?pos>/g;
+        let p;
+        while ((p = reP.exec(ringXml))) {
+          const nums = p[1].trim().split(/\s+/).map(Number);
+          if (nums.length >= 2) out.push([nums[0], nums[1]]);
+        }
+        return out;
+      }
+
+      // Tên trường thuộc tính hay gặp (so khớp không phân biệt hoa thường, bỏ "_").
+      const FIELD_ALIASES = {
+        to: ['sohieutobando', 'sotobando', 'soto', 'shbando', 'tobando', 'to'],
+        thua: ['sothututhua', 'sothua', 'thua', 'sttthua'],
+        dienTich: ['dientich', 'dientichphaply', 'dtpl', 'area'],
+        loaiDat: ['maloaidat', 'loaidat', 'kyhieumucdich', 'mucdichsudung'],
+        tenChu: ['tenchu', 'tenchusudung', 'chusudung'],
+        trangThai: ['trangthaidangky', 'trangthaidk', 'trangthai'],
+        khoa: ['khoa', 'label']
+      };
+      const pickAlias = (attrs, key) => {
+        for (const a of FIELD_ALIASES[key]) if (attrs[a] != null && attrs[a] !== '') return attrs[a];
+        return '';
+      };
+      // trangThaiDangKy dạng số (mã nhập, xem TRANG_THAI_DK_TEXT): 1 = chưa đăng ký -> 'CDK';
+      // 2–5 = đã đăng ký / đã cấp GCN -> 'DDK'; trống hoặc 0 mặc định = 1 (chưa đăng ký);
+      // mã khác = chưa rõ -> ''. Dạng chữ (DDK/CDK) giữ nguyên.
+      const normTrangThai = (v) => {
+        const s = String(v == null ? '' : v).trim().toUpperCase();
+        if (/^0*$/.test(s)) return { tt: 'CDK', ma: 1 };
+        if (/^\d+$/.test(s)) {
+          const ma = Number(s);
+          return { tt: ma === 1 ? 'CDK' : (ma >= 2 && ma <= 5 ? 'DDK' : ''), ma: ma >= 1 && ma <= 5 ? ma : null };
+        }
+        return { tt: s, ma: null };
+      };
+
+      return function parseGML(text, opts) {
+        opts = opts || {};
+        const t = String(text || '');
+        const srsM = t.match(/\bsrsName="([^"]*)"/);
+        const srsName = srsM ? srsM[1] : '';
+        let crs = opts.lon0 ? { kind: 'vn2000', lon0: Number(opts.lon0), k0: Number(opts.k0) || 0.9999 }
+          : crsFromSrsName(srsName);
+
+        const members = [];
+        const reM = /<(?:\w+:)?(member|featureMember)\b[^>]*>([\s\S]*?)<\/(?:\w+:)?\1>/g;
+        let mm;
+        while ((mm = reM.exec(t))) members.push(mm[2]);
+        if (!members.length) throw new Error('Không tìm thấy đối tượng (member/featureMember) nào trong file GML.');
+
+        // Chưa rõ hệ toạ độ: nếu số liệu trông như độ (|x|≤180) thì coi là WGS-84,
+        // còn là mét thì bắt buộc phải biết KTT.
+        if (!crs) {
+          const r0 = (members[0].match(/<(?:\w+:)?LinearRing\b[\s\S]*?<\/(?:\w+:)?LinearRing>/) || [''])[0];
+          const p0 = ringNumbers(r0)[0];
+          if (p0 && Math.abs(p0[0]) <= 180 && Math.abs(p0[1]) <= 180) crs = { kind: 'wgs84' };
+          else {
+            const err = new Error('NEED_LON0');
+            err.code = 'NEED_LON0';
+            err.srsName = srsName;
+            throw err;
+          }
+        }
+
+        const toLatLng = crs.kind === 'wgs84'
+          // Việt Nam: vĩ độ 8–24, kinh độ 102–110 -> tự nhận thứ tự trục lat/lon
+          ? (a, b) => (a < 30 && b > 90 ? [a, b] : [b, a])
+          // VN-2000 ở VN luôn có Bắc (X ≥ ~900 000) > Đông (Y ≤ ~800 000)
+          // -> tự nhận file ghi "Đông Bắc" (GIS) hay "Bắc Đông" (trắc địa)
+          : (a, b) => (a > b ? vn2000ToLatLng(a, b, crs.lon0, crs.k0) : vn2000ToLatLng(b, a, crs.lon0, crs.k0));
+
+        const byId = {};
+        let skipped = 0;
+        members.forEach(xml => {
+          const rings = [];
+          const reR = /<(?:\w+:)?LinearRing\b[\s\S]*?<\/(?:\w+:)?LinearRing>/g;
+          let rm;
+          while ((rm = reR.exec(xml))) {
+            const pts = ringNumbers(rm[0]).filter(c => isFinite(c[0]) && isFinite(c[1])).map(c => toLatLng(c[0], c[1]));
+            if (pts.length > 2) rings.push(pts);
+          }
+
+          // Thuộc tính: các phần tử lá (không chứa thẻ con) sau khi bỏ khối hình học
+          const attrXml = xml.replace(/<(?:\w+:)?(Polygon|MultiPolygon|MultiSurface|Surface|Point|LineString|MultiCurve|MultiPoint)\b[\s\S]*?<\/(?:\w+:)?\1>/g, '');
+          const attrs = {};
+          const reA = /<(?:\w+:)?([\w.-]+)\b[^>]*?(?:\/>|>([^<]*)<\/(?:\w+:)?\1>)/g;
+          let am;
+          while ((am = reA.exec(attrXml))) {
+            const k = am[1].toLowerCase().replace(/[_.-]/g, '');
+            if (attrs[k] == null) attrs[k] = am[2] != null ? decodeXml(am[2]) : '';
+          }
+
+          const so = String(pickAlias(attrs, 'to')).trim(), th = String(pickAlias(attrs, 'thua')).trim();
+          let id = so && th ? `${Number(so) || so}-${Number(th) || th}` : '';
+          if (!id) {
+            const k = String(pickAlias(attrs, 'khoa')).match(/^(\d+)\s*[-–]\s*(\d+)/);
+            if (k) id = `${k[1]}-${k[2]}`;
+          }
+          if (!id || !rings.length) { skipped++; return; }
+
+          if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', trangThaiDK: '', chiDuong: '', rings: [] };
+          const p = byId[id];
+          const dt = pickAlias(attrs, 'dienTich');
+          if (dt && !p.dienTich) p.dienTich = String(dt);
+          const ld = pickAlias(attrs, 'loaiDat');
+          if (ld && !p.loaiDat) p.loaiDat = String(ld);
+          const tc = pickAlias(attrs, 'tenChu');
+          if (tc && !p.tenChu) p.tenChu = String(tc);
+          const tt = normTrangThai(pickAlias(attrs, 'trangThai'));
+          if (tt.tt && !p.trangThaiDK) p.trangThaiDK = tt.tt;
+          if (tt.ma && !p.trangThaiMa) p.trangThaiMa = tt.ma;
+          rings.forEach(r => p.rings.push(r));
+        });
+
+        Object.values(byId).forEach(p => {
+          const r = p.rings[0];
+          p.lat = r.reduce((s, c) => s + c[0], 0) / r.length;
+          p.lon = r.reduce((s, c) => s + c[1], 0) / r.length;
+        });
+        const parcels = Object.values(byId).sort((a, b) => {
+          const [aT, aU] = a.id.split('-').map(Number);
+          const [bT, bU] = b.id.split('-').map(Number);
+          return aT !== bT ? aT - bT : aU - bU;
+        });
+        return { parcels, ranhThon: { lines: [], labels: [] }, hsqXaLink: '', crs, srsName, skipped };
+      };
     }
+    const parseGML = createGmlParser();
+
+    // Mã nhập trạng thái thửa đất (trường trangThaiDangKy trong GML gCadas/ViLIS)
+    const TRANG_THAI_DK_TEXT = {
+      1: 'Chưa đăng ký',
+      2: 'Đã đăng ký, chưa đủ điều kiện cấp GCN',
+      3: 'Đã đăng ký, không đủ điều kiện cấp GCN',
+      4: 'Đã đăng ký, đủ điều kiện cấp GCN',
+      5: 'Đã cấp GCN'
+    };
+
+    function parseGMLAsync(text, opts) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const fallback = () => {
+          if (settled) return;
+          settled = true;
+          try { resolve(parseGML(text, opts)); } catch (err) { reject(err); }
+        };
+        try {
+          if (!window.Worker) return fallback();
+          const src = `const parseGML = (${createGmlParser.toString()})();
+            self.onmessage = (e) => {
+              try { self.postMessage({ ok: true, data: parseGML(e.data.text, e.data.opts) }); }
+              catch (err) { self.postMessage({ ok: false, code: err.code || '', srsName: err.srsName || '', message: String(err && err.message || err) }); }
+            };`;
+          const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+          const worker = new Worker(url);
+          const done = () => { clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url); };
+          const timeout = setTimeout(() => { done(); fallback(); }, 60000);
+          worker.onmessage = (e) => {
+            if (settled) return;
+            done();
+            const d = e.data || {};
+            if (d.ok) { settled = true; resolve(d.data); return; }
+            if (d.code) {
+              // Lỗi nghiệp vụ (vd thiếu KTT) -> trả nguyên cho luồng chính xử lý, không chạy lại
+              settled = true;
+              const err = new Error(d.message);
+              err.code = d.code;
+              err.srsName = d.srsName;
+              reject(err);
+              return;
+            }
+            fallback();
+          };
+          worker.onerror = () => { done(); fallback(); };
+          worker.postMessage({ text, opts });
+        } catch (err) {
+          fallback();
+        }
+      });
+    }
+
+    // Hỏi KTT khi file GML không ghi rõ (nhớ lần nhập trước theo máy).
+    const GML_LON0_STORAGE_KEY = 'tdmap_gml_lon0';
+    function askGmlLon0(srsName) {
+      let last = '';
+      try { last = localStorage.getItem(GML_LON0_STORAGE_KEY) || ''; } catch (e) { }
+      const ans = window.prompt(
+        'File GML dùng toạ độ VN-2000 (mét) nhưng không ghi rõ kinh tuyến trục' +
+        (srsName ? ` (srsName = "${srsName}")` : '') + '.\n\n' +
+        'Nhập kinh tuyến trục của dữ liệu, vd: 107.75 hoặc 107 45 (độ phút).\n' +
+        'Múi 3°, k0 = 0,9999. Xem trong hồ sơ / thiết kế kỹ thuật của bản đồ.',
+        last
+      );
+      if (ans == null) return null;
+      const m = String(ans).trim().replace(',', '.').match(/^(\d{3})(?:\.(\d+)|\s+(\d{1,2}))?$/);
+      if (!m) return NaN;
+      const lon0 = m[3] ? Number(m[1]) + Number(m[3]) / 60 : Number(m[1] + (m[2] ? '.' + m[2] : ''));
+      if (!(lon0 >= 100 && lon0 <= 115)) return NaN;
+      try { localStorage.setItem(GML_LON0_STORAGE_KEY, String(ans).trim()); } catch (e) { }
+      return lon0;
+    }
+
+    // ── NHẬN DIỆN ĐỊNH DẠNG FILE (KML / GeoJSON / GML) ────────────────────────────
+    function detectMapFormat(filename, text) {
+      const lower = (filename || '').toLowerCase();
+      if (lower.endsWith('.geojson') || lower.endsWith('.json')) return 'geojson';
+      if (lower.endsWith('.gml')) return 'gml';
+      if (lower.endsWith('.kml')) return 'kml';
+      // Không xác định được qua đuôi file (hoặc .xml) -> dò nội dung
+      const head = (text || '').slice(0, 4000);
+      if (head.trim().replace(/^﻿/, '').startsWith('{')) return 'geojson';
+      if (/<kml\b/i.test(head)) return 'kml';
+      if (/opengis\.net\/gml/i.test(head)) return 'gml';
+      return 'kml';
+    }
+    const MAP_FORMAT_LABEL = { geojson: 'GeoJSON', kml: 'KML', gml: 'GML' };
 
     // ── FILE ──────────────────────────────────────────────────────────────────────
     function handleFile(file) {
       if (!file) return;
       const nameLower = file.name.toLowerCase();
-      if (!nameLower.endsWith('.kml') && !nameLower.endsWith('.geojson') && !nameLower.endsWith('.json')) {
+      if (!/\.(kml|geojson|json|gml)$/.test(nameLower)) {
         showAlert(
           `File "${file.name}" không đúng định dạng.\n` +
-          `Vui lòng chọn file có đuôi .kml hoặc .geojson do TDMAP xuất ra.`
+          `Vui lòng chọn file .kml, .geojson do TDMAP xuất ra, hoặc file .gml thửa đất (gCadas/ViLIS/QGIS).`
         );
         document.getElementById('fileInput').value = '';
         return;
@@ -5690,19 +6835,33 @@
     // progressStart: % đã hoàn thành ở giai đoạn TRƯỚC đó (đọc file / tải mạng),
     // để thanh tiến trình nối tiếp liền mạch thay vì nhảy lại từ 0.
     async function processMapText(text, fileName, progressStart = 0) {
-      const isGeoJSON = detectIsGeoJSON(fileName, text);
+      const format = detectMapFormat(fileName, text);
       const parseEnd = progressStart + (100 - progressStart) * 0.55; // mốc cuối giai đoạn "phân tích"
-      showStatus(isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
-      FileProgress.creepTo(parseEnd, isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
+      const parseMsg = `Đang phân tích dữ liệu ${MAP_FORMAT_LABEL[format]}...`;
+      showStatus(parseMsg);
+      FileProgress.creepTo(parseEnd, parseMsg);
 
       let result;
       try {
-        result = isGeoJSON ? await parseGeoJSONAsync(text) : await parseKMLAsync(text);
+        if (format === 'gml') {
+          try {
+            result = await parseGMLAsync(text);
+          } catch (err) {
+            if (err.code !== 'NEED_LON0') throw err;
+            const lon0 = askGmlLon0(err.srsName);
+            if (lon0 == null) { FileProgress.fail('Đã hủy'); showStatus('Đã hủy mở file GML.'); return false; }
+            if (isNaN(lon0)) throw new Error('Kinh tuyến trục không hợp lệ (cần dạng 107.75 hoặc 107 45, trong khoảng 100–115°).');
+            result = await parseGMLAsync(text, { lon0 });
+          }
+        } else {
+          result = format === 'geojson' ? await parseGeoJSONAsync(text) : await parseKMLAsync(text);
+        }
+        if (format === 'gml' && !result.parcels.length) throw new Error('Không đọc được thửa đất nào (thiếu ranh thửa hoặc số tờ/số thửa).');
       } catch (err) {
         FileProgress.fail('Lỗi đọc file');
         showAlert(
           `Không thể đọc file này (${fileName}).\n` +
-          `Vui lòng kiểm tra đây là file .kml hoặc .geojson hợp lệ do TDMAP xuất ra.\n\nChi tiết lỗi: ${err}`
+          `Vui lòng kiểm tra đây là file .kml/.geojson hợp lệ do TDMAP xuất ra, hoặc file .gml thửa đất.\n\nChi tiết lỗi: ${err && err.message || err}`
         );
         return false;
       }
@@ -5722,8 +6881,11 @@
       document.getElementById('splash').style.display = 'none';
       const soThonLines = (result.ranhThon && result.ranhThon.lines) ? result.ranhThon.lines.length : 0;
       const thonNote = soThonLines > 0 ? ` (kèm ranh thôn)` : '';
+      const crsNote = (result.crs && result.crs.kind === 'vn2000')
+        ? ` · VN-2000 KTT ${+result.crs.lon0.toFixed(4)}°` : '';
+      const skipNote = result.skipped ? ` · bỏ qua ${result.skipped} đối tượng thiếu tờ/thửa hoặc ranh` : '';
       FileProgress.finish(`✓ Xong · ${allParcels.length} thửa`);
-      showStatus(`✓ ${allParcels.length} thửa${thonNote} – ${fileName}`);
+      showStatus(`✓ ${allParcels.length} thửa${thonNote}${crsNote}${skipNote} – ${fileName}`);
       return true;
     }
 
@@ -6547,14 +7709,14 @@
           pageToken = data.nextPageToken || '';
         } while (pageToken);
 
-        const geojsonFiles = files.filter(f => f.name.toLowerCase().endsWith('.geojson'));
+        const geojsonFiles = files.filter(f => /\.(geojson|gml)$/i.test(f.name));
 
         if (geojsonFiles.length === 0) {
-          setDriveStatus('Không tìm thấy file .geojson nào trong thư mục này.', true);
+          setDriveStatus('Không tìm thấy file .geojson / .gml nào trong thư mục này.', true);
           return;
         }
 
-        setDriveStatus(`✓ Tìm thấy ${geojsonFiles.length} file .geojson. Nhấn để mở:`);
+        setDriveStatus(`✓ Tìm thấy ${geojsonFiles.length} file bản đồ (.geojson/.gml). Nhấn để mở:`);
         const sorted = geojsonFiles.sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''));
         for (const f of sorted) {
           const cached = await LocalMapCache.get(f.id);
@@ -7009,7 +8171,7 @@
       const fc = buildGeoJSONFromParcels(allParcels);
       const blob = new Blob([JSON.stringify(fc)], { type: 'application/geo+json' });
       const url = URL.createObjectURL(blob);
-      const baseName = (currentLoadedFileName || 'tdmap').replace(/\.(geojson|json|kml)$/i, '');
+      const baseName = (currentLoadedFileName || 'tdmap').replace(/\.(geojson|json|kml|gml)$/i, '');
       const a = document.createElement('a');
       a.href = url;
       a.download = `${baseName}_capnhat.geojson`;
@@ -8347,7 +9509,8 @@ Bấm Hủy để chụp lại (nút 📷 trên trang), hoặc OK để vẫn l�
           const text = await decodeQr(await getOut(p));
           p.qrText = text || '';
           p.qr = text ? (parseCccdQr(text) || { raw: text }) : null;
-          console.log('[Scan] QR:', text);
+          // KHÔNG in nội dung QR (CCCD chứa số định danh, họ tên, địa chỉ) ra console
+          console.log('[Scan] QR:', text ? `đọc được ${text.length} ký tự` : 'không có');
           saveManifest();
         } catch (e) { console.warn('[Scan] QR lỗi:', e.message); p.qr = null; }
         finally { st.qrBusy = false; }
